@@ -364,11 +364,7 @@ impl PyMatch {
     /// With one str: text of that named group, or ``None``.
     /// With multiple args: a tuple of the per-arg results.
     #[pyo3(signature = (*args))]
-    fn group<'py>(
-        &self,
-        py: Python<'py>,
-        args: &Bound<'py, PyTuple>,
-    ) -> PyResult<Py<PyAny>> {
+    fn group<'py>(&self, py: Python<'py>, args: &Bound<'py, PyTuple>) -> PyResult<Py<PyAny>> {
         if args.is_empty() {
             let items: Vec<Py<PyAny>> = self
                 .groups
@@ -433,11 +429,7 @@ impl PyMatch {
         self.groups.len()
     }
 
-    fn __getitem__<'py>(
-        &self,
-        py: Python<'py>,
-        key: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
+    fn __getitem__<'py>(&self, py: Python<'py>, key: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         opt_to_py(py, self.lookup(key)?)
     }
 

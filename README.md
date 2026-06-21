@@ -129,6 +129,17 @@ The [`examples/`](./examples) directory contains runnable programs:
 
 Run them with `cargo run --example demo` / `cargo run --example gap_match`.
 
+## Development
+
+A shared pre-commit hook runs `cargo fmt --all --check` and
+`cargo test --workspace` before each commit. Enable it once per clone:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+Bypass it for a single commit with `git commit --no-verify`.
+
 ## Compatibility
 
 * **MSRV:** 1.85 (uses the 2024 edition).

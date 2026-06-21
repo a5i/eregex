@@ -274,10 +274,7 @@ impl Match {
                     .collect()
             })
             .collect();
-        let named = names
-            .iter()
-            .map(|(k, &v)| (k.clone(), v as u32))
-            .collect();
+        let named = names.iter().map(|(k, &v)| (k.clone(), v as u32)).collect();
         Match {
             input: haystack.to_string(),
             groups,
@@ -399,11 +396,7 @@ impl Match {
     #[napi]
     pub fn captures_by_name(&self, name: String) -> Vec<Option<String>> {
         match self.named.get(&name) {
-            Some(&idx) => self
-                .captures
-                .get(idx as usize)
-                .cloned()
-                .unwrap_or_default(),
+            Some(&idx) => self.captures.get(idx as usize).cloned().unwrap_or_default(),
             None => Vec::new(),
         }
     }
@@ -478,10 +471,7 @@ impl PartialMatch {
                 }
             }
         }
-        let named = names
-            .iter()
-            .map(|(k, &v)| (k.clone(), v as u32))
-            .collect();
+        let named = names.iter().map(|(k, &v)| (k.clone(), v as u32)).collect();
         PartialMatch {
             status_full,
             matched,
@@ -546,9 +536,7 @@ impl PartialMatch {
     /// participate.
     #[napi]
     pub fn group(&self, index: u32) -> Option<String> {
-        self.group_text
-            .get(index as usize)
-            .and_then(|o| o.clone())
+        self.group_text.get(index as usize).and_then(|o| o.clone())
     }
 
     /// Text of a named group (matched or partial), or `null`.

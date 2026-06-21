@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Pre-commit hook: enforce `cargo fmt --check` and `cargo test` before a commit
+# lands. Shared with collaborators via the repo; each clone opts in once with:
+#
+#     git config core.hooksPath .githooks
+#
+# Bypass for a single commit with `git commit --no-verify`.
+
+set -euo pipefail
+
+if [ -t 1 ]; then
+    GREEN=$'\033[0;32m'; YELLOW=$'\033[0;33m'; RED=$'\033[0;31m'; NC=$'\033[0m'
+else
+    GREEN=''; YELLOW=''; RED=''; NC=''
+fi
+
+info() { printf '%s[pre-commit]%s %s\n' "$GREEN" "$NC" "$*"; }
+warn() { printf '%s[pre-commit]%s %s\n' "$YELLOW" "$NC" "$*"; }
+fail() { printf '%s[pre-commit]%s %s\n' "$RED" "$NC" "$*" >&2; }
+
+# Skip entirely when no Rust sources / manifests are staged.
+if ! git diff --cached --name-only --diff-filter=ACMR \
+        | grep -qE '\.(rs|toml)$|^Cargo\.lock$'; then
+    info "No Rust files staged, skipping checks."
+    exit 0
+fi
+
+info "Running 'cargo fmt --all --check'..."
+if ! cargo fmt --all --check; then
+    fail "Formatting check failed."
+    warn "Fix with:    cargo fmt --all"
+    warn "Or bypass:   git commit --no-verify"
+    exit 1
+fi
+
+info "Running 'cargo test --workspace'..."
+if ! cargo test --workspace --quiet; then
+    fail "Tests failed."
+    warn "Fix the failing tests, or bypass with: git commit --no-verify"
+    exit 1
+fi
+
+info "All checks passed."
+exit 0
