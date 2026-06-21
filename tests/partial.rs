@@ -20,7 +20,7 @@
 use pregex::Regex;
 
 fn re(p: &str) -> Regex {
-    Regex::new(p).expect(&format!("failed to compile {p:?}"))
+    Regex::new(p).unwrap_or_else(|_| panic!("failed to compile {p:?}"))
 }
 
 // #1 — literal prefix matched; required tail (`-[0-9]{4}`) missing.
@@ -184,7 +184,9 @@ fn tc17_boundary_word_started() {
 #[test]
 fn tc19_email_tld_partial() {
     let r = re(r"([a-z]+(?:\.[a-z]+)*)@([a-z]+)\.([a-z]{2,})");
-    let m = r.find_partial("contact: john.doe@example").expect("partial");
+    let m = r
+        .find_partial("contact: john.doe@example")
+        .expect("partial");
     assert!(m.is_partial());
     assert_eq!(m.matched, "john.doe@example");
     assert!(m.group_matched(1));
@@ -221,7 +223,9 @@ fn tc22_wrong_separator_no_match() {
 #[test]
 fn tc23_named_groups_second_partial() {
     let r = re(r"user=(?P<user>[a-z]+) action=(?P<action>login|logout)");
-    let m = r.find_partial("event user=alice action=lo").expect("partial");
+    let m = r
+        .find_partial("event user=alice action=lo")
+        .expect("partial");
     assert!(m.is_partial());
     assert_eq!(m.name("user"), Some("alice"));
     assert_eq!(m.group(1), Some("alice"));

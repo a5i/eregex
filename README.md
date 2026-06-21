@@ -87,6 +87,60 @@ assert!(re.find_partial("xxx token=abc!").is_none());
 * Concurrent/GIL-free operation, timeouts
 * `\L<name>` named lists
 
+## Core concepts
+
+* [`Regex`](https://docs.rs/pregex/latest/pregex/struct.Regex.html) — a
+  compiled pattern. Compile once with [`Regex::new`] (or
+  [`Regex::new_with_flags`]), then search many inputs.
+* [`Match`](https://docs.rs/pregex/latest/pregex/struct.Match.html) — a
+  successful full match, with group lookup by index or name and full repeated-
+  capture history.
+* [`PartialMatch`](https://docs.rs/pregex/latest/pregex/struct.PartialMatch.html) —
+  the result of [`Regex::find_partial`], carrying a [`MatchStatus`] of `Full`
+  or `Partial` and per-group [`GroupMatch`] state.
+* [`Flags`](https://docs.rs/pregex/latest/pregex/flags/struct.Flags.html) and
+  the [`flags`](https://docs.rs/pregex/latest/pregex/flags/index.html) module —
+  compile-time flags (`IGNORECASE`, `MULTILINE`, `DOTALL`, …) and their inline
+  `(?im)` syntax.
+
+## Error handling
+
+All fallible operations return [`Result<T, Error>`](https://docs.rs/pregex/latest/pregex/error/type.Result.html).
+[`Error`](https://docs.rs/pregex/latest/pregex/error/struct.Error.html) carries
+an [`ErrorKind`](https://docs.rs/pregex/latest/pregex/error/enum.ErrorKind.html)
+(syntax error, bad escape, bad quantifier, unknown group, …) plus the byte
+offset in the pattern where the problem was detected, when known.
+
+```rust
+use pregex::Regex;
+
+let err = Regex::new(r"(").unwrap_err();
+println!("{}", err); // e.g. "pregex error at position 1: unclosed group"
+```
+
+## Examples
+
+The [`examples/`](./examples) directory contains runnable programs:
+
+* [`demo.rs`](./examples/demo.rs) — a tour of the core API.
+* [`gap_match.rs`](./examples/gap_match.rs) — gap-tolerant ("fuzzy") matching
+  built on `find_at` + `find_partial`, for inputs where the target is split by
+  noise (a workaround while in-pattern fuzzy matching is on the roadmap).
+
+Run them with `cargo run --example demo` / `cargo run --example gap_match`.
+
+## Compatibility
+
+* **MSRV:** 1.85 (uses the 2024 edition).
+* **License:** Apache-2.0.
+* `#![forbid(unsafe_code)]` is enforced crate-wide.
+
 ## License
 
 Apache-2.0, matching the upstream `mrab-regex` project.
+
+[`Regex::new`]: https://docs.rs/pregex/latest/pregex/struct.Regex.html#method.new
+[`Regex::new_with_flags`]: https://docs.rs/pregex/latest/pregex/struct.Regex.html#method.new_with_flags
+[`Regex::find_partial`]: https://docs.rs/pregex/latest/pregex/struct.Regex.html#method.find_partial
+[`MatchStatus`]: https://docs.rs/pregex/latest/pregex/enum.MatchStatus.html
+[`GroupMatch`]: https://docs.rs/pregex/latest/pregex/enum.GroupMatch.html

@@ -1,6 +1,6 @@
 //! The public module-level API surface of `pregex::*`.
 
-use pregex::{flags, Regex};
+use pregex::{Regex, flags};
 
 // --- module-level convenience functions -----------------------------------
 
@@ -81,7 +81,10 @@ fn regex_captures_alias_and_iter() {
     let r = Regex::new(r"(\w)(\d)").unwrap();
     let m = r.captures("a1").unwrap();
     assert_eq!(m.group(1), Some("a"));
-    let ms: Vec<_> = r.captures_iter("a1 b2 c3").map(|m| m.as_str().to_string()).collect();
+    let ms: Vec<_> = r
+        .captures_iter("a1 b2 c3")
+        .map(|m| m.as_str().to_string())
+        .collect();
     assert_eq!(ms, vec!["a1", "b2", "c3"]);
 }
 

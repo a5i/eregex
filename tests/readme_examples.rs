@@ -6,7 +6,7 @@
 //! the test asserts that the parser or API *gracefully rejects* the syntax
 //! with a clear error message, so silent wrong answers are impossible.
 
-use pregex::{flags, Regex};
+use pregex::{Regex, flags};
 
 // ===========================================================================
 // §1  Lookaround in conditional pattern  (?(?=\d)\d+|\w+)
@@ -65,7 +65,10 @@ fn readme_capturesdict() {
         m.captures_name("word"),
         vec![Some("one"), Some("two"), Some("three")]
     );
-    assert_eq!(m.captures_name("digits"), vec![Some("1"), Some("2"), Some("3")]);
+    assert_eq!(
+        m.captures_name("digits"),
+        vec![Some("1"), Some("2"), Some("3")]
+    );
     // capturesdict(): a map name -> all captures.
     let cd = m.captures_dict();
     assert_eq!(cd.get("word").unwrap(), &vec!["one", "two", "three"]);
@@ -153,10 +156,12 @@ fn readme_full_casefolding_currently_simple_only() {
     // ASCII case-insensitive still works.
     assert_eq!(r.find("STRASSE").unwrap().as_str(), "STRASSE");
     // The ß<->ss expansion is NOT yet supported.
-    assert!(Regex::new_with_flags(r"(?i)strasse", flags::VERSION1)
-        .unwrap()
-        .find("stra\u{DF}e")
-        .is_none());
+    assert!(
+        Regex::new_with_flags(r"(?i)strasse", flags::VERSION1)
+            .unwrap()
+            .find("stra\u{DF}e")
+            .is_none()
+    );
 }
 
 // ===========================================================================
@@ -240,12 +245,25 @@ fn readme_atomic_grouping() {
 fn readme_possessive_quantifiers() {
     // (?:...)?+  (?:...)*+  (?:...)++  (?:...){m,n}+
     assert!(Regex::new(r"a++a").unwrap().find("aaa").is_none());
-    assert_eq!(Regex::new(r"a++").unwrap().find("aaa").unwrap().as_str(), "aaa");
+    assert_eq!(
+        Regex::new(r"a++").unwrap().find("aaa").unwrap().as_str(),
+        "aaa"
+    );
     // Possessive `{2,}+` grabs as many as possible and refuses to give back:
     // it takes all three 'ab's, then the trailing 'ab' fails with no backtrack.
-    assert!(Regex::new(r"(?:ab){2,}+ab").unwrap().find("ababab").is_none());
+    assert!(
+        Regex::new(r"(?:ab){2,}+ab")
+            .unwrap()
+            .find("ababab")
+            .is_none()
+    );
     // The non-possessive form backtracks and matches.
-    assert!(Regex::new(r"(?:ab){2,}ab").unwrap().find("ababab").is_some());
+    assert!(
+        Regex::new(r"(?:ab){2,}ab")
+            .unwrap()
+            .find("ababab")
+            .is_some()
+    );
 }
 
 // ===========================================================================
@@ -292,7 +310,10 @@ fn readme_match_subscripting() {
     assert_eq!(m.len(), 4);
     // m[:] -> all groups; our analogue is all_groups().
     let all = m.all_groups();
-    assert_eq!(all, vec![Some("pqr123stu"), Some("pqr"), Some("123"), Some("stu")]);
+    assert_eq!(
+        all,
+        vec![Some("pqr123stu"), Some("pqr"), Some("123"), Some("stu")]
+    );
 }
 
 // ===========================================================================
@@ -322,12 +343,37 @@ fn readme_group_reference_g_name() {
 // ---------------------------------------------------------------------------
 #[test]
 fn readme_unicode_property_forms() {
-    assert_eq!(Regex::new(r"\p{L}+").unwrap().find("abc123").unwrap().as_str(), "abc");
-    assert_eq!(Regex::new(r"\p{N}+").unwrap().find("abc123").unwrap().as_str(), "123");
-    assert_eq!(Regex::new(r"\P{N}+").unwrap().find("123abc").unwrap().as_str(), "abc");
+    assert_eq!(
+        Regex::new(r"\p{L}+")
+            .unwrap()
+            .find("abc123")
+            .unwrap()
+            .as_str(),
+        "abc"
+    );
+    assert_eq!(
+        Regex::new(r"\p{N}+")
+            .unwrap()
+            .find("abc123")
+            .unwrap()
+            .as_str(),
+        "123"
+    );
+    assert_eq!(
+        Regex::new(r"\P{N}+")
+            .unwrap()
+            .find("123abc")
+            .unwrap()
+            .as_str(),
+        "abc"
+    );
     // gc=value long form.
     assert_eq!(
-        Regex::new(r"\p{gc=nd}+").unwrap().find("abc123").unwrap().as_str(),
+        Regex::new(r"\p{gc=nd}+")
+            .unwrap()
+            .find("abc123")
+            .unwrap()
+            .as_str(),
         "123"
     );
 }
@@ -390,8 +436,13 @@ fn readme_recursive_patterns_rejected() {
     for p in [r"(?R)", r"(?1)", r"(Tarzan|Jane) loves (?1)"] {
         let e = Regex::new(p).unwrap_err();
         let s = e.to_string();
-        assert!(s.contains("recursive") || s.contains("subpattern") || s.contains("flag") || s.contains("conditional"),
-            "{p:?}: {s}");
+        assert!(
+            s.contains("recursive")
+                || s.contains("subpattern")
+                || s.contains("flag")
+                || s.contains("conditional"),
+            "{p:?}: {s}"
+        );
     }
 }
 

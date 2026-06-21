@@ -5,8 +5,16 @@ use pregex::flags::{self, Flags};
 #[test]
 fn flag_constants_distinct() {
     let all = [
-        flags::IGNORECASE, flags::MULTILINE, flags::DOTALL, flags::UNICODE, flags::ASCII,
-        flags::VERBOSE, flags::FULLCASE, flags::WORD, flags::LOCALE, flags::VERSION0,
+        flags::IGNORECASE,
+        flags::MULTILINE,
+        flags::DOTALL,
+        flags::UNICODE,
+        flags::ASCII,
+        flags::VERBOSE,
+        flags::FULLCASE,
+        flags::WORD,
+        flags::LOCALE,
+        flags::VERSION0,
         flags::VERSION1,
     ];
     for (i, a) in all.iter().enumerate() {
@@ -68,7 +76,11 @@ fn scoped_vs_global_split() {
     assert!(global_only.scoped().is_empty());
 
     let mixed = flags::IGNORECASE | flags::VERSION0 | flags::MULTILINE;
-    assert!(mixed.scoped().contains(flags::IGNORECASE | flags::MULTILINE));
+    assert!(
+        mixed
+            .scoped()
+            .contains(flags::IGNORECASE | flags::MULTILINE)
+    );
     assert!(mixed.global().contains(flags::VERSION0));
 }
 

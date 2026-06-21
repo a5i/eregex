@@ -1,25 +1,18 @@
 //! `pregex` — an advanced regular expression engine for Rust.
 //!
-//! Inspired by the Python [`regex`](https://github.com/mrabarnett/mrab-regex)
-//! module (mrab-regex), this crate provides a richer regex feature set than the
-//! standard Rust `regex` crate, while keeping an ergonomic API.
-//!
-//! # Quick start
-//!
-//! ```
-//! use pregex::Regex;
-//!
-//! let re = Regex::new(r"(\w+)\s+(\w+)").unwrap();
-//! let m = re.find("hello world").unwrap();
-//! assert_eq!(m.group(1), Some("hello"));
-//! assert_eq!(m.group(2), Some("world"));
-//! ```
-//!
-//! See the [`Regex`](crate::Regex) type and the module-level functions for the
-//! full API. The [`flags`](crate::flags) module exposes the flag constants.
+//! The full overview, quick-start guide, feature matrix and roadmap live in
+//! the [`README`](https://github.com/mrabarnett/mrab-regex#readme), which is
+//! also rendered as this crate's documentation landing page (see below). For
+//! navigating the API, start with [`Regex`] for matching and [`Match`] for
+//! results, then see [`PartialMatch`] for end-anchored partial matching and
+//! [`flags`] for compile-time flags.
 
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+#![warn(rustdoc::broken_intra_doc_links)]
+#![warn(rustdoc::bare_urls)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod charset;
 pub mod error;

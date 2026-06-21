@@ -77,9 +77,15 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let msg = match &self.kind {
-            ErrorKind::Syntax(s) | ErrorKind::BadEscape(s) | ErrorKind::BadCharClass(s)
-            | ErrorKind::BadRepeat(s) | ErrorKind::BadGroupRef(s) | ErrorKind::DuplicateGroup(s)
-            | ErrorKind::BadFlag(s) | ErrorKind::BadProperty(s) | ErrorKind::TooLarge(s) => s,
+            ErrorKind::Syntax(s)
+            | ErrorKind::BadEscape(s)
+            | ErrorKind::BadCharClass(s)
+            | ErrorKind::BadRepeat(s)
+            | ErrorKind::BadGroupRef(s)
+            | ErrorKind::DuplicateGroup(s)
+            | ErrorKind::BadFlag(s)
+            | ErrorKind::BadProperty(s)
+            | ErrorKind::TooLarge(s) => s,
             ErrorKind::Timeout => "regex timed out",
         };
         match self.position {

@@ -1,5 +1,5 @@
-//! Recursive-descent parser turning a pattern string into a resolved
-//! [`Node`](crate::ast::Node) tree.
+//! Recursive-descent parser turning a pattern string into a resolved AST
+//! node tree.
 //!
 //! All flag-dependent behaviour is resolved here: case-insensitivity, ASCII
 //! vs Unicode, multiline, dotall, verbose. The resulting tree is what the
@@ -179,9 +179,7 @@ impl Parser {
             let node = apply_quant(atom, q)?;
             // Reject `a++`, `a*+?` style chains on an already-quantified node.
             if self.parse_quant()?.is_some() {
-                return Err(self.err(ErrorKind::BadRepeat(
-                    "multiple quantifiers".into(),
-                )));
+                return Err(self.err(ErrorKind::BadRepeat("multiple quantifiers".into())));
             }
             Ok(node)
         } else {
@@ -224,13 +222,28 @@ impl Parser {
         match self.peek() {
             Some('?') => {
                 self.bump();
-                Quant { min, max, greedy: false, possessive: false }
+                Quant {
+                    min,
+                    max,
+                    greedy: false,
+                    possessive: false,
+                }
             }
             Some('+') => {
                 self.bump();
-                Quant { min, max, greedy: true, possessive: true }
+                Quant {
+                    min,
+                    max,
+                    greedy: true,
+                    possessive: true,
+                }
             }
-            _ => Quant { min, max, greedy: true, possessive: false },
+            _ => Quant {
+                min,
+                max,
+                greedy: true,
+                possessive: false,
+            },
         }
     }
 
@@ -243,16 +256,19 @@ impl Parser {
         // Detect fuzzy-matching specifiers like `{e<=1}`, `{i,s}`, `{d<=3}`
         // (mrab-regex approximate matching). We don't implement fuzzy matching
         // yet; reject clearly rather than silently treating as a literal.
-        if self.peek().map_or(false, |c| matches!(c, 'e' | 'i' | 'd' | 's')) {
+        if self
+            .peek()
+            .map_or(false, |c| matches!(c, 'e' | 'i' | 'd' | 's'))
+        {
             // Peek ahead for a fuzzy-spec signature: an operator letter
             // followed by `<`, `<=`, `,`, `}`, or another letter.
             let nxt = self.peek_at(1);
-            if nxt.map_or(false, |c| matches!(c, '<' | ',' | '}' | '+' | 'i' | 'd' | 's' | 'e')) {
+            if nxt.map_or(false, |c| {
+                matches!(c, '<' | ',' | '}' | '+' | 'i' | 'd' | 's' | 'e')
+            }) {
                 let pos = self.byte_off[start.min(self.byte_off.len() - 1)];
                 return Err(Error::at(
-                    ErrorKind::Syntax(
-                        "fuzzy matching ({...}) is not yet supported".into(),
-                    ),
+                    ErrorKind::Syntax("fuzzy matching ({...}) is not yet supported".into()),
                     pos,
                 ));
             }
@@ -284,9 +300,8 @@ impl Parser {
         self.bump(); // consume '}'
 
         let parse_usize = |s: &str| -> Result<usize> {
-            s.parse::<usize>().map_err(|_| {
-                self.err(ErrorKind::BadRepeat("bad repeat count".into()))
-            })
+            s.parse::<usize>()
+                .map_err(|_| self.err(ErrorKind::BadRepeat("bad repeat count".into())))
         };
 
         let (min, max) = if !has_comma {
@@ -305,15 +320,19 @@ impl Parser {
             }
         } else {
             // `{m,}` or `{m,n}` or `{,n}`.
-            let min = if first_str.is_empty() { 0 } else { parse_usize(&first_str)? };
+            let min = if first_str.is_empty() {
+                0
+            } else {
+                parse_usize(&first_str)?
+            };
             let max = if second_str.is_empty() {
                 None
             } else {
                 let m = parse_usize(&second_str)?;
                 if m < min {
-                    return Err(self.err(ErrorKind::BadRepeat(
-                        "min greater than max in {m,n}".into(),
-                    )));
+                    return Err(
+                        self.err(ErrorKind::BadRepeat("min greater than max in {m,n}".into()))
+                    );
                 }
                 Some(m)
             };
@@ -343,15 +362,21 @@ impl Parser {
             }
             '.' => {
                 self.bump();
-                Ok(Node::Any { dotall: self.dotall() })
+                Ok(Node::Any {
+                    dotall: self.dotall(),
+                })
             }
             '^' => {
                 self.bump();
-                Ok(Node::StartLine { multiline: self.multiline() })
+                Ok(Node::StartLine {
+                    multiline: self.multiline(),
+                })
             }
             '$' => {
                 self.bump();
-                Ok(Node::EndLine { multiline: self.multiline() })
+                Ok(Node::EndLine {
+                    multiline: self.multiline(),
+                })
             }
             '*' | '+' | '?' => Err(self.err(ErrorKind::BadRepeat(format!(
                 "nothing to repeat before {c:?}"
@@ -369,7 +394,10 @@ impl Parser {
     /// simplicity here we return a single-char `Lit`; the sequence builder
     /// handles runs.
     fn lit_char(&self, c: char) -> Node {
-        Node::Lit { ch: c, ign: self.ign() }
+        Node::Lit {
+            ch: c,
+            ign: self.ign(),
+        }
     }
 
     // -- groups ------------------------------------------------------------
@@ -398,7 +426,10 @@ impl Parser {
             let body = self.parse_alternation()?;
             self.flags = saved;
             self.expect_close(open_pos)?;
-            Ok(Node::Group { index: idx, node: Box::new(body) })
+            Ok(Node::Group {
+                index: idx,
+                node: Box::new(body),
+            })
         }
     }
 
@@ -426,7 +457,11 @@ impl Parser {
                 let body = self.parse_alternation()?;
                 self.flags = saved;
                 self.expect_close(open_pos)?;
-                Ok(Node::Look { behind: false, positive, node: Box::new(body) })
+                Ok(Node::Look {
+                    behind: false,
+                    positive,
+                    node: Box::new(body),
+                })
             }
             Some('<') => {
                 // Could be lookbehind (?<= / (?<! or named group (?<name>
@@ -439,7 +474,11 @@ impl Parser {
                         let body = self.parse_alternation()?;
                         self.flags = saved;
                         self.expect_close(open_pos)?;
-                        Ok(Node::Look { behind: true, positive, node: Box::new(body) })
+                        Ok(Node::Look {
+                            behind: true,
+                            positive,
+                            node: Box::new(body),
+                        })
                     }
                     _ => {
                         // (?<name>...)
@@ -460,7 +499,10 @@ impl Parser {
                         self.bump();
                         let name = self.read_group_name(')', open_pos)?;
                         let idx = self.lookup_name(&name, open_pos)?;
-                        Ok(Node::BackRef { group: idx, ign: self.ign() })
+                        Ok(Node::BackRef {
+                            group: idx,
+                            ign: self.ign(),
+                        })
                     }
                     Some('>') | Some('&') => Err(self.err(ErrorKind::Syntax(
                         "recursive subpattern calls (?P>...) are not yet supported".into(),
@@ -468,11 +510,9 @@ impl Parser {
                     _ => Err(self.err(ErrorKind::Syntax("bad (?P...) extension".into()))),
                 }
             }
-            Some('(') => {
-                Err(self.err(ErrorKind::Syntax(
-                    "conditional (?(...)) and (?(DEFINE)...) are not yet supported".into(),
-                )))
-            }
+            Some('(') => Err(self.err(ErrorKind::Syntax(
+                "conditional (?(...)) and (?(DEFINE)...) are not yet supported".into(),
+            ))),
             Some('#') => {
                 // (?#...) comment: skip to ')'.
                 self.bump();
@@ -509,7 +549,10 @@ impl Parser {
         let body = self.parse_alternation()?;
         self.flags = saved;
         self.expect_close(open_pos)?;
-        Ok(Node::Group { index: idx, node: Box::new(body) })
+        Ok(Node::Group {
+            index: idx,
+            node: Box::new(body),
+        })
     }
 
     fn read_group_name(&mut self, terminator: char, open_pos: usize) -> Result<String> {
@@ -531,10 +574,7 @@ impl Parser {
             }
         }
         if name.is_empty() || self.peek() != Some(terminator) {
-            return Err(self.err_msg(
-                ErrorKind::Syntax("missing group name".into()),
-                open_pos,
-            ));
+            return Err(self.err_msg(ErrorKind::Syntax("missing group name".into()), open_pos));
         }
         self.bump(); // consume terminator
         Ok(name)
@@ -542,7 +582,10 @@ impl Parser {
 
     fn lookup_name(&self, name: &str, pos: usize) -> Result<usize> {
         self.names.get(name).copied().ok_or_else(|| {
-            Error::at(ErrorKind::BadGroupRef(format!("unknown group name {name:?}")), pos)
+            Error::at(
+                ErrorKind::BadGroupRef(format!("unknown group name {name:?}")),
+                pos,
+            )
         })
     }
 
@@ -581,10 +624,7 @@ impl Parser {
         if self.eat(')') {
             Ok(())
         } else {
-            Err(self.err_msg(
-                ErrorKind::Syntax("missing closing ')'".into()),
-                open_pos,
-            ))
+            Err(self.err_msg(ErrorKind::Syntax("missing closing ')'".into()), open_pos))
         }
     }
 
@@ -636,7 +676,7 @@ impl Parser {
             None => {
                 return Err(self.err(ErrorKind::BadCharClass(
                     "unterminated character class".into(),
-                )))
+                )));
             }
         };
 
@@ -653,12 +693,23 @@ impl Parser {
             self.bump();
             match self.parse_escape(true)? {
                 Node::Lit { ch, .. } => ch,
-                Node::Predef { kind, negated, ascii } => {
-                    cc.items.push(ClassItem::Predef { kind, negated, ascii });
+                Node::Predef {
+                    kind,
+                    negated,
+                    ascii,
+                } => {
+                    cc.items.push(ClassItem::Predef {
+                        kind,
+                        negated,
+                        ascii,
+                    });
                     return Ok(());
                 }
                 Node::Prop(p) => {
-                    cc.items.push(ClassItem::Prop { pred: p.pred, negated: p.negated });
+                    cc.items.push(ClassItem::Prop {
+                        pred: p.pred,
+                        negated: p.negated,
+                    });
                     return Ok(());
                 }
                 Node::Class { cc: inner } => {
@@ -671,7 +722,7 @@ impl Parser {
                     return Err(self.err_msg(
                         ErrorKind::BadCharClass(format!("invalid class member {other:?}")),
                         start_pos,
-                    ))
+                    ));
                 }
             }
         } else {
@@ -691,7 +742,7 @@ impl Parser {
                         return Err(self.err_msg(
                             ErrorKind::BadCharClass("bad range endpoint".into()),
                             start_pos,
-                        ))
+                        ));
                     }
                 }
             } else if let Some(h) = self.bump() {
@@ -719,11 +770,12 @@ impl Parser {
     fn detect_set_op(&self) -> bool {
         let a = self.peek();
         let b = self.peek_at(1);
-        matches!((a, b),
+        matches!(
+            (a, b),
             (Some('&'), Some('&'))
-            | (Some('-'), Some('-'))
-            | (Some('|'), Some('|'))
-            | (Some('~'), Some('~'))
+                | (Some('-'), Some('-'))
+                | (Some('|'), Some('|'))
+                | (Some('~'), Some('~'))
         )
     }
 
@@ -766,7 +818,7 @@ impl Parser {
                 return Err(Error::at(
                     ErrorKind::BadCharClass(format!("unknown POSIX class [:{name}:]")),
                     start_pos,
-                ))
+                ));
             }
         };
         Ok(Some(ClassItem::Prop { pred, negated: neg }))
@@ -779,27 +831,62 @@ impl Parser {
         let c = match self.bump() {
             Some(c) => c,
             None => {
-                return Err(self.err_msg(
-                    ErrorKind::BadEscape("trailing backslash".into()),
-                    start_pos,
-                ))
+                return Err(
+                    self.err_msg(ErrorKind::BadEscape("trailing backslash".into()), start_pos)
+                );
             }
         };
         match c {
             // Predefined classes.
-            'd' => Ok(Node::Predef { kind: Predef::Digit, negated: false, ascii: self.ascii() }),
-            'D' => Ok(Node::Predef { kind: Predef::Digit, negated: true, ascii: self.ascii() }),
-            'w' => Ok(Node::Predef { kind: Predef::Word, negated: false, ascii: self.ascii() }),
-            'W' => Ok(Node::Predef { kind: Predef::Word, negated: true, ascii: self.ascii() }),
-            's' => Ok(Node::Predef { kind: Predef::Space, negated: false, ascii: self.ascii() }),
-            'S' => Ok(Node::Predef { kind: Predef::Space, negated: true, ascii: self.ascii() }),
+            'd' => Ok(Node::Predef {
+                kind: Predef::Digit,
+                negated: false,
+                ascii: self.ascii(),
+            }),
+            'D' => Ok(Node::Predef {
+                kind: Predef::Digit,
+                negated: true,
+                ascii: self.ascii(),
+            }),
+            'w' => Ok(Node::Predef {
+                kind: Predef::Word,
+                negated: false,
+                ascii: self.ascii(),
+            }),
+            'W' => Ok(Node::Predef {
+                kind: Predef::Word,
+                negated: true,
+                ascii: self.ascii(),
+            }),
+            's' => Ok(Node::Predef {
+                kind: Predef::Space,
+                negated: false,
+                ascii: self.ascii(),
+            }),
+            'S' => Ok(Node::Predef {
+                kind: Predef::Space,
+                negated: true,
+                ascii: self.ascii(),
+            }),
 
             // Anchors (only outside classes; inside a class \b is backspace).
-            'b' if !in_set => Ok(Node::WordBoundary { negated: false, ascii: self.ascii() }),
-            'B' if !in_set => Ok(Node::WordBoundary { negated: true, ascii: self.ascii() }),
+            'b' if !in_set => Ok(Node::WordBoundary {
+                negated: false,
+                ascii: self.ascii(),
+            }),
+            'B' if !in_set => Ok(Node::WordBoundary {
+                negated: true,
+                ascii: self.ascii(),
+            }),
             // \m = start of word, \M = end of word (mrab-regex additions).
-            'm' if !in_set => Ok(Node::WordEdge { end: false, ascii: self.ascii() }),
-            'M' if !in_set => Ok(Node::WordEdge { end: true, ascii: self.ascii() }),
+            'm' if !in_set => Ok(Node::WordEdge {
+                end: false,
+                ascii: self.ascii(),
+            }),
+            'M' if !in_set => Ok(Node::WordEdge {
+                end: true,
+                ascii: self.ascii(),
+            }),
             // \X = single grapheme cluster (approximated as one char).
             'X' if !in_set => Ok(Node::Grapheme),
             // mrab-regex extensions that we do NOT yet support. Erroring
@@ -860,7 +947,10 @@ impl Parser {
                             start_pos,
                         ));
                     }
-                    Ok(Node::BackRef { group: idx, ign: self.ign() })
+                    Ok(Node::BackRef {
+                        group: idx,
+                        ign: self.ign(),
+                    })
                 }
             }
             // \g<number> or \g<name> or \g'name' — backreference.
@@ -880,7 +970,10 @@ impl Parser {
                 } else {
                     self.lookup_name(&name, start_pos)?
                 };
-                Ok(Node::BackRef { group: idx, ign: self.ign() })
+                Ok(Node::BackRef {
+                    group: idx,
+                    ign: self.ign(),
+                })
             }
             // \k<name> backreference (PCRE style).
             'k' if !in_set => {
@@ -892,7 +985,10 @@ impl Parser {
                     ));
                 }
                 let idx = self.lookup_name(&name, start_pos)?;
-                Ok(Node::BackRef { group: idx, ign: self.ign() })
+                Ok(Node::BackRef {
+                    group: idx,
+                    ign: self.ign(),
+                })
             }
 
             // Unicode properties.
@@ -900,14 +996,25 @@ impl Parser {
                 let positive = c == 'p';
                 let name = self.read_property_name(start_pos)?;
                 let inner_neg = name.starts_with('^');
-                let name = if inner_neg { name[1..].to_string() } else { name };
+                let name = if inner_neg {
+                    name[1..].to_string()
+                } else {
+                    name
+                };
                 // \p{X} matches X, \P{X} matches not-X, and a leading `^`
                 // inside the braces flips the sense again.
                 let negated = !positive ^ inner_neg;
                 let pred = unicode::property(&name).ok_or_else(|| {
-                    self.err_msg(ErrorKind::BadProperty(format!("unknown property {name:?}")), start_pos)
+                    self.err_msg(
+                        ErrorKind::BadProperty(format!("unknown property {name:?}")),
+                        start_pos,
+                    )
                 })?;
-                Ok(Node::Prop(Property { name, negated, pred }))
+                Ok(Node::Prop(Property {
+                    name,
+                    negated,
+                    pred,
+                }))
             }
 
             // Hex escapes.
@@ -939,7 +1046,10 @@ impl Parser {
                     }
                 }
                 let ch = char::from_u32(v).ok_or_else(|| {
-                    self.err_msg(ErrorKind::BadEscape("invalid octal escape".into()), start_pos)
+                    self.err_msg(
+                        ErrorKind::BadEscape("invalid octal escape".into()),
+                        start_pos,
+                    )
                 })?;
                 Ok(self.lit_char_or_class(ch, in_set))
             }
@@ -975,7 +1085,10 @@ impl Parser {
                 if chars.is_empty() {
                     Ok(Node::Empty)
                 } else {
-                    Ok(Node::LitStr { chars, ign: self.ign() })
+                    Ok(Node::LitStr {
+                        chars,
+                        ign: self.ign(),
+                    })
                 }
             }
 
@@ -990,12 +1103,18 @@ impl Parser {
         // the class level; a plain Lit is fine because the class member logic
         // only reads `ch`.
         let _ = in_set;
-        Node::Lit { ch, ign: self.ign() }
+        Node::Lit {
+            ch,
+            ign: self.ign(),
+        }
     }
 
     fn parse_g_ref(&mut self, start_pos: usize) -> Result<(String, bool)> {
         let open = self.bump().ok_or_else(|| {
-            self.err_msg(ErrorKind::BadGroupRef("expected '<' or '\\'' after \\g".into()), start_pos)
+            self.err_msg(
+                ErrorKind::BadGroupRef("expected '<' or '\\'' after \\g".into()),
+                start_pos,
+            )
         })?;
         let close = match open {
             '<' => '>',
@@ -1004,7 +1123,7 @@ impl Parser {
                 return Err(self.err_msg(
                     ErrorKind::BadGroupRef("expected '<' or '\\'' after \\g".into()),
                     start_pos,
-                ))
+                ));
             }
         };
         let mut s = String::new();
@@ -1040,7 +1159,7 @@ impl Parser {
                 return Err(self.err_msg(
                     ErrorKind::BadProperty("expected '{' after \\p".into()),
                     start_pos,
-                ))
+                ));
             }
         }
         let mut s = String::new();
@@ -1105,9 +1224,8 @@ impl Parser {
                 start_pos,
             ));
         }
-        let v = u32::from_str_radix(&s, 16).map_err(|_| {
-            self.err_msg(ErrorKind::BadEscape("bad hex digits".into()), start_pos)
-        })?;
+        let v = u32::from_str_radix(&s, 16)
+            .map_err(|_| self.err_msg(ErrorKind::BadEscape("bad hex digits".into()), start_pos))?;
         char::from_u32(v).ok_or_else(|| {
             self.err_msg(ErrorKind::BadEscape("invalid codepoint".into()), start_pos)
         })

@@ -32,7 +32,7 @@
 use pregex::{MatchStatus, Regex};
 
 fn re(p: &str) -> Regex {
-    Regex::new(p).expect(&format!("failed to compile {p:?}"))
+    Regex::new(p).unwrap_or_else(|_| panic!("failed to compile {p:?}"))
 }
 
 const PAT: &str = r"(STM32)(F[0-9]{3})([A-Z0-9]{4})";
@@ -99,8 +99,14 @@ fn gap_find(haystack: &str, segments: &[Segment], max_gap: usize) -> Option<GapM
 /// "split" group: `F` comes from segment 1's tail, `407` from segment 2's head.
 fn stm32_segments() -> Vec<Segment> {
     vec![
-        Segment { re: re(r"STM32F"), label: "STM32F" },
-        Segment { re: re(r"[0-9]{3}[A-Z0-9]{4}"), label: "407VGT6" },
+        Segment {
+            re: re(r"STM32F"),
+            label: "STM32F",
+        },
+        Segment {
+            re: re(r"[0-9]{3}[A-Z0-9]{4}"),
+            label: "407VGT6",
+        },
     ]
 }
 
@@ -171,7 +177,9 @@ fn stm32_partial_inside_series_digits() {
 #[test]
 fn stm32_partial_suffix() {
     let r = re(PAT);
-    let m = r.find_partial("Microcontroller STM32F407VG").expect("partial");
+    let m = r
+        .find_partial("Microcontroller STM32F407VG")
+        .expect("partial");
     assert!(m.is_partial());
     assert_eq!(m.matched, "STM32F407VG");
     assert_eq!(m.group(1), Some("STM32"));
@@ -218,10 +226,7 @@ fn stm32_split_by_noise_between_f_and_407() {
     // Segment ranges (ASCII ⇒ byte offsets == char offsets). NOTE: the source
     // document's ruler is off-by-one here — the engine-verified offsets are
     // 16..22 / 32..39, not 16..22 / 33..40.
-    assert_eq!(
-        gm.segments,
-        vec![("STM32F", 16, 22), ("407VGT6", 32, 39)]
-    );
+    assert_eq!(gm.segments, vec![("STM32F", 16, 22), ("407VGT6", 32, 39)]);
     assert_eq!(&hay[16..22], "STM32F");
     assert_eq!(&hay[32..39], "407VGT6");
 
@@ -232,7 +237,9 @@ fn stm32_split_by_noise_between_f_and_407() {
     // Re-validate against the full contiguous pattern: the reconstruction
     // must be a genuine Full match with clean capture groups.
     let full = re(PAT);
-    let p = full.find_partial(&gm.reconstructed).expect("reconstruction re-matches");
+    let p = full
+        .find_partial(&gm.reconstructed)
+        .expect("reconstruction re-matches");
     assert_eq!(p.status, MatchStatus::Full);
     assert_eq!(p.group(1), Some("STM32"));
     assert_eq!(p.group(2), Some("F407"));
@@ -263,15 +270,14 @@ fn stm32_gap_allowed_between_f_and_digits() {
     let gm = gap_find(hay, &stm32_segments(), 16).expect("gap match");
 
     assert_eq!(gm.reconstructed, "STM32F407VGT6");
-    assert_eq!(
-        gm.segments,
-        vec![("STM32F", 16, 22), ("407VGT6", 32, 39)]
-    );
+    assert_eq!(gm.segments, vec![("STM32F", 16, 22), ("407VGT6", 32, 39)]);
     assert_eq!(gm.skipped, vec![(22, 32)]);
 
     // Re-validation: clean Full match with the expected groups.
     let full = re(PAT);
-    let p = full.find_partial(&gm.reconstructed).expect("reconstruction re-matches");
+    let p = full
+        .find_partial(&gm.reconstructed)
+        .expect("reconstruction re-matches");
     assert_eq!(p.status, MatchStatus::Full);
     assert_eq!(p.group(1), Some("STM32"));
     assert_eq!(p.group(2), Some("F407"));

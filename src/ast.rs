@@ -51,9 +51,13 @@ pub enum ClassItem {
 impl ClassItem {
     /// Does this member match `c`?
     pub fn matches(&self, c: char) -> bool {
- match self {
+        match self {
             ClassItem::Set(set) => set.contains(c),
-            ClassItem::Predef { kind, negated, ascii } => {
+            ClassItem::Predef {
+                kind,
+                negated,
+                ascii,
+            } => {
                 let p = match kind {
                     Predef::Digit => crate::unicode::is_digit(c, *ascii),
                     Predef::Word => crate::unicode::is_word(c, *ascii),
@@ -78,7 +82,10 @@ pub struct CharClass {
 impl CharClass {
     /// Create an empty (positive) class.
     pub fn new() -> Self {
-        CharClass { items: Vec::new(), negated: false }
+        CharClass {
+            items: Vec::new(),
+            negated: false,
+        }
     }
 
     /// Does this class match `c`?
@@ -241,7 +248,13 @@ impl Node {
     }
 
     /// Apply a quantifier to `self`, returning the new node.
-    pub fn quantified(self, min: usize, max: Option<usize>, greedy: bool, possessive: bool) -> Node {
+    pub fn quantified(
+        self,
+        min: usize,
+        max: Option<usize>,
+        greedy: bool,
+        possessive: bool,
+    ) -> Node {
         let repeat = Node::Repeat {
             node: Box::new(self),
             min,
@@ -265,9 +278,18 @@ impl Node {
             Node::LitStr { chars, ign } => writeln!(f, "{pad}LitStr {:?} ign={ign}", chars),
             Node::Any { dotall } => writeln!(f, "{pad}Any dotall={dotall}"),
             Node::Class { cc } => {
-                writeln!(f, "{pad}Class negated={} ({} items)", cc.negated, cc.items.len())
+                writeln!(
+                    f,
+                    "{pad}Class negated={} ({} items)",
+                    cc.negated,
+                    cc.items.len()
+                )
             }
-            Node::Predef { kind, negated, ascii } => {
+            Node::Predef {
+                kind,
+                negated,
+                ascii,
+            } => {
                 writeln!(f, "{pad}Predef {kind:?} neg={negated} ascii={ascii}")
             }
             Node::Prop(p) => writeln!(f, "{pad}Prop {} neg={}", p.name, p.negated),
@@ -308,12 +330,21 @@ impl Node {
                 }
                 Ok(())
             }
-            Node::Repeat { node, min, max, greedy } => {
+            Node::Repeat {
+                node,
+                min,
+                max,
+                greedy,
+            } => {
                 writeln!(f, "{pad}Repeat min={min} max={max:?} greedy={greedy}")?;
                 node.dump(f, indent + 1)
             }
             Node::BackRef { group, ign } => writeln!(f, "{pad}BackRef {group} ign={ign}"),
-            Node::Look { behind, positive, node } => {
+            Node::Look {
+                behind,
+                positive,
+                node,
+            } => {
                 writeln!(f, "{pad}Look behind={behind} positive={positive}")?;
                 node.dump(f, indent + 1)
             }

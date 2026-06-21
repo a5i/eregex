@@ -102,8 +102,14 @@ fn gap_find(haystack: &str, segments: &[Segment], max_gap: usize) -> Option<GapM
 /// (`F407`) the "split" group: `F` from segment 1, `407` from segment 2.
 fn stm32_segments() -> Vec<Segment> {
     vec![
-        Segment { re: Regex::new(r"STM32F").unwrap(), label: "STM32F" },
-        Segment { re: Regex::new(r"[0-9]{3}[A-Z0-9]{4}").unwrap(), label: "407VGT6" },
+        Segment {
+            re: Regex::new(r"STM32F").unwrap(),
+            label: "STM32F",
+        },
+        Segment {
+            re: Regex::new(r"[0-9]{3}[A-Z0-9]{4}").unwrap(),
+            label: "407VGT6",
+        },
     ]
 }
 
@@ -117,7 +123,10 @@ fn report(name: &str, hay: &str, max_gap: usize) {
 
     // (1) Show what the bare engine does — both strict and end-anchored partial.
     let full = Regex::new(FULL).unwrap();
-    println!("  find         : {:?}", full.find(hay).map(|m| m.as_str().to_string()));
+    println!(
+        "  find         : {:?}",
+        full.find(hay).map(|m| m.as_str().to_string())
+    );
     println!(
         "  find_partial : {:?}",
         match full.find_partial(hay) {
@@ -189,22 +198,39 @@ fn main() {
 
     // #7 — a wrong char *inside* the digits segment (`X` where a digit is
     // expected). No `[0-9]{3}` run exists, so the segment search fails.
-    report("#7 wrong char inside series", "Microcontroller STM32FX07VGT6", 16);
+    report(
+        "#7 wrong char inside series",
+        "Microcontroller STM32FX07VGT6",
+        16,
+    );
 
     // #8 — wrong family (`STM8` instead of `STM32`): the first segment is
     // never found.
     report("#8 wrong family", "Microcontroller STM8F407VGT6", 16);
 
     // #1 — the contiguous happy path: no gap, reconstruction == input tail.
-    report("#1 contiguous full match", "Microcontroller STM32F407VGT6", 16);
+    report(
+        "#1 contiguous full match",
+        "Microcontroller STM32F407VGT6",
+        16,
+    );
 
     println!("\n--- end-of-input partials (find_partial alone, no gap mode) ---");
     let full = Regex::new(FULL).unwrap();
-    for hay in ["Microcontroller STM32F", "Microcontroller STM32F40", "Microcontroller STM32F407VG"] {
+    for hay in [
+        "Microcontroller STM32F",
+        "Microcontroller STM32F40",
+        "Microcontroller STM32F407VG",
+    ] {
         let p = full.find_partial(hay).unwrap();
         println!(
             "  {:<32} -> {:?} matched={:?} g1={:?} g2={:?} g3={:?}",
-            hay, p.status, p.matched, p.group(1), p.group(2), p.group(3)
+            hay,
+            p.status,
+            p.matched,
+            p.group(1),
+            p.group(2),
+            p.group(3)
         );
     }
 

@@ -1,7 +1,7 @@
 //! Edge cases: escapes, quantifier corners, parser errors, replace templates,
 //! and subtle matcher behaviour.
 
-use pregex::{flags, Regex};
+use pregex::{Regex, flags};
 
 /// Re-export the error kind for assertions.
 use pregex::error::ErrorKind;
@@ -179,10 +179,7 @@ fn duplicate_group_name_now_allowed() {
     let r = Regex::new(r"(?P<item>\w+)? or (?P<item>\w+)?").unwrap();
     let m = r.find("first or second").unwrap();
     assert_eq!(m.name("item"), Some("second"));
-    assert_eq!(
-        m.captures_name("item"),
-        vec![Some("first"), Some("second")]
-    );
+    assert_eq!(m.captures_name("item"), vec![Some("first"), Some("second")]);
 }
 #[test]
 fn backref_to_unknown_group_errors() {

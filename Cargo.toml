@@ -2,13 +2,19 @@
 name = "pregex"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 authors = ["pregex contributors"]
 description = "An advanced regular expression engine for Rust, inspired by mrab-regex"
 license = "Apache-2.0"
 repository = "https://github.com/mrabarnett/mrab-regex"
+documentation = "https://docs.rs/pregex"
 keywords = ["regex", "regular-expression", "text", "pattern", "fuzzy"]
 categories = ["text-processing"]
 readme = "README.md"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [lib]
 name = "pregex"

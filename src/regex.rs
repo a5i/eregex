@@ -5,11 +5,33 @@ use std::collections::HashMap;
 use crate::ast::Node;
 use crate::error::Result;
 use crate::flags::Flags;
-use crate::matcher;
 use crate::match_obj::{FindIter, GroupMatch, Match, MatchStatus, PartialMatch};
+use crate::matcher;
 use crate::state::State;
 
 /// A compiled regular expression.
+///
+/// A `Regex` is obtained by compiling a pattern with [`Regex::new`] (default
+/// flags) or [`Regex::new_with_flags`], then used to search text via methods
+/// like [`find`](Self::find), [`is_match`](Self::is_match),
+/// [`find_iter`](Self::find_iter), [`find_partial`](Self::find_partial),
+/// [`replace`](Self::replace) and [`split`](Self::split).
+///
+/// Compilation is somewhat expensive; compile once and reuse the same
+/// `Regex` across many inputs. A `Regex` is `Send` + `Sync` once compiled
+/// (it owns no thread-local state) and is cheap to share by reference.
+///
+/// # Examples
+///
+/// ```
+/// use pregex::{flags, Regex};
+///
+/// let re = Regex::new(r"(\w+)@(\w+)")?;
+/// let m = re.find("ping alice@work").unwrap();
+/// assert_eq!(m.group(1), Some("alice"));
+/// assert_eq!(m.group(2), Some("work"));
+/// # Ok::<(), pregex::Error>(())
+/// ```
 pub struct Regex {
     pattern: String,
     ast: Box<Node>,
@@ -20,11 +42,43 @@ pub struct Regex {
 
 impl Regex {
     /// Compile `pattern` with the default flags.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error`](crate::Error) if `pattern` is syntactically invalid (unbalanced
+    /// parentheses, bad escape sequences, invalid quantifiers, unknown
+    /// group names, etc.). See [`ErrorKind`](crate::error::ErrorKind) for the
+    /// full list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pregex::Regex;
+    ///
+    /// let re = Regex::new(r"\d{3}-\d{2}")?;
+    /// assert!(re.is_match("123-45"));
+    /// assert!(Regex::new(r"(").is_err());
+    /// # Ok::<(), pregex::Error>(())
+    /// ```
     pub fn new(pattern: &str) -> Result<Regex> {
         Self::new_with_flags(pattern, Flags::NONE)
     }
 
     /// Compile `pattern` with the given [`Flags`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error`](crate::Error) on the same conditions as [`Regex::new`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pregex::{flags, Regex};
+    ///
+    /// let re = Regex::new_with_flags(r"hello", flags::IGNORECASE)?;
+    /// assert_eq!(re.find("HELLO, World").unwrap().as_str(), "HELLO");
+    /// # Ok::<(), pregex::Error>(())
+    /// ```
     pub fn new_with_flags(pattern: &str, flags: Flags) -> Result<Regex> {
         let parsed = crate::parser::parse(pattern, flags)?;
         Ok(Regex {
@@ -116,12 +170,41 @@ impl Regex {
     // -- matching API ------------------------------------------------------
 
     /// Returns `true` if the pattern matches anywhere in `haystack`.
+    ///
+    /// Cheaper than [`find`](Self::find) when the match text is not needed —
+    /// it short-circuits as soon as any match is found.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pregex::Regex;
+    /// let re = Regex::new(r"\d+")?;
+    /// assert!(re.is_match("abc 123"));
+    /// assert!(!re.is_match("no digits here"));
+    /// # Ok::<(), pregex::Error>(())
+    /// ```
     pub fn is_match(&self, haystack: &str) -> bool {
         let mut st = self.build_state(haystack);
         self.find_from(&mut st, 0).is_some()
     }
 
-    /// Search for the first match. Returns `None` if there is no match.
+    /// Search for the first match, anywhere in `haystack`. Returns [`None`] if
+    /// there is no match. The returned [`Match`] carries the whole-match span
+    /// and all capture groups.
+    ///
+    /// For end-anchored / partial matching use [`find_partial`](Self::find_partial).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pregex::Regex;
+    /// let re = Regex::new(r"([a-z]+)(\d+)")?;
+    /// let m = re.find("x abc42 y").unwrap();
+    /// assert_eq!(m.as_str(), "abc42");
+    /// assert_eq!(m.start(), 2);
+    /// assert_eq!(m.group(2), Some("42"));
+    /// # Ok::<(), pregex::Error>(())
+    /// ```
     pub fn find<'h>(&self, haystack: &'h str) -> Option<Match<'h>> {
         let mut st = self.build_state(haystack);
         self.find_from(&mut st, 0)?;
@@ -129,6 +212,22 @@ impl Regex {
     }
 
     /// Search for the first match at or after byte offset `start`.
+    ///
+    /// `start` is clamped to `haystack.len()`; it counts bytes, not chars,
+    /// but may fall in the middle of a UTF-8 sequence only if it lies beyond
+    /// the haystack end. Useful for resuming a scan after a previous match.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pregex::Regex;
+    /// let re = Regex::new(r"\d+")?;
+    /// let hay = "a1 b2 c3";
+    /// let first = re.find(hay).unwrap();
+    /// let next = re.find_at(hay, first.end()).unwrap();
+    /// assert_eq!(next.as_str(), "2");
+    /// # Ok::<(), pregex::Error>(())
+    /// ```
     pub fn find_at<'h>(&self, haystack: &'h str, start: usize) -> Option<Match<'h>> {
         let mut st = self.build_state(haystack);
         let clamp = start.min(haystack.len());
@@ -144,6 +243,16 @@ impl Regex {
 
     /// Require a match anchored at the **start** of the haystack (like
     /// Python's `re.match`). The match need not reach the end.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pregex::Regex;
+    /// let re = Regex::new(r"\d+")?;
+    /// assert_eq!(re.match_at_start("123abc").unwrap().as_str(), "123");
+    /// assert!(re.match_at_start("abc123").is_none());
+    /// # Ok::<(), pregex::Error>(())
+    /// ```
     pub fn match_at_start<'h>(&self, haystack: &'h str) -> Option<Match<'h>> {
         let mut st = self.build_state(haystack);
         st.reset_for_search(0);
@@ -159,6 +268,16 @@ impl Regex {
 
     /// Require a match that covers the **entire** haystack (Python's
     /// `re.fullmatch`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pregex::Regex;
+    /// let re = Regex::new(r"\d{3}")?;
+    /// assert!(re.fullmatch("123").is_some());
+    /// assert!(re.fullmatch("1234").is_none());
+    /// # Ok::<(), pregex::Error>(())
+    /// ```
     pub fn fullmatch<'h>(&self, haystack: &'h str) -> Option<Match<'h>> {
         let mut st = self.build_state(haystack);
         let n = st.len();
@@ -174,6 +293,19 @@ impl Regex {
     }
 
     /// Iterate over non-overlapping matches.
+    ///
+    /// Zero-width matches are yielded once per position and do not loop
+    /// infinitely: after one, the iterator advances past the next character.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pregex::Regex;
+    /// let re = Regex::new(r"\d+")?;
+    /// let ms: Vec<_> = re.find_iter("a1 bb 22").map(|m| m.as_str().to_string()).collect();
+    /// assert_eq!(ms, vec!["1", "22"]);
+    /// # Ok::<(), pregex::Error>(())
+    /// ```
     pub fn find_iter<'r, 'h>(&'r self, haystack: &'h str) -> FindIter<'r, 'h> {
         FindIter {
             re: self,
@@ -204,6 +336,23 @@ impl Regex {
     /// Group state within a [`PartialMatch`] distinguishes groups that
     /// completed ([`GroupMatch::Matched`]) from the group that was entered but
     /// not completed ([`GroupMatch::Partial`]).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pregex::{MatchStatus, Regex};
+    /// let re = Regex::new(r"token=([a-z]+)([0-9]+)")?;
+    ///
+    /// // Incomplete input — more could turn it into a full match.
+    /// let p = re.find_partial("x token=abc").unwrap();
+    /// assert_eq!(p.status, MatchStatus::Partial);
+    /// assert_eq!(p.group(1), Some("abc")); // fully matched
+    /// assert_eq!(p.group(2), Some(""));    // entered but empty
+    ///
+    /// // A wrong character rules out any continuation -> no match at all.
+    /// assert!(re.find_partial("x token=abc!").is_none());
+    /// # Ok::<(), pregex::Error>(())
+    /// ```
     pub fn find_partial<'h>(&self, haystack: &'h str) -> Option<PartialMatch<'h>> {
         let mut st = self.build_state(haystack);
         let n = st.len();
@@ -292,6 +441,19 @@ impl Regex {
     // -- substitution / splitting -----------------------------------------
 
     /// Replace the first match with the expansion of `repl`.
+    ///
+    /// `repl` supports `$1`/`${name}`/`$&`/`$$` templates (see the module docs
+    /// for the full syntax). If nothing matches, `haystack` is returned
+    /// unchanged.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pregex::Regex;
+    /// let re = Regex::new(r"(\w+) (\w+)")?;
+    /// assert_eq!(re.replace("hello world", "$2 $1"), "world hello");
+    /// # Ok::<(), pregex::Error>(())
+    /// ```
     pub fn replace(&self, haystack: &str, repl: &str) -> String {
         let mut st = self.build_state(haystack);
         match self.find_from(&mut st, 0) {
@@ -310,6 +472,17 @@ impl Regex {
     }
 
     /// Replace every non-overlapping match with the expansion of `repl`.
+    ///
+    /// See [`replace`](Self::replace) for the template syntax.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pregex::Regex;
+    /// let re = Regex::new(r"(?P<a>\d)(?P<b>\d)")?;
+    /// assert_eq!(re.replace_all("12 34", "${b}${a}"), "21 43");
+    /// # Ok::<(), pregex::Error>(())
+    /// ```
     pub fn replace_all(&self, haystack: &str, repl: &str) -> String {
         let mut out = String::with_capacity(haystack.len());
         let mut st = self.build_state(haystack);
@@ -348,6 +521,15 @@ impl Regex {
 
     /// Split `haystack` by this pattern, including capturing-group text
     /// between parts (matching Python's `re.split` semantics).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pregex::Regex;
+    /// let re = Regex::new(r"\s+")?;
+    /// assert_eq!(re.split("a  b c"), vec!["a", "b", "c"]);
+    /// # Ok::<(), pregex::Error>(())
+    /// ```
     pub fn split(&self, haystack: &str) -> Vec<String> {
         self.split_iter(haystack).collect()
     }

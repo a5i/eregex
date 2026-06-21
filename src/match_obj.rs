@@ -7,6 +7,22 @@ use std::collections::HashMap;
 /// Group indexing follows the usual convention: index `0` is the whole match,
 /// indices `1..` are capturing groups in order of opening parenthesis, and
 /// named groups may also be looked up by name.
+///
+/// Obtain a `Match` from [`Regex::find`](crate::Regex::find) and friends. For
+/// repeated captures (the signature mrab-regex feature), use
+/// [`captures`](Self::captures) to see every value a group took.
+///
+/// # Examples
+///
+/// ```
+/// use pregex::Regex;
+/// let re = Regex::new(r"(?P<host>\w+)=(?P<port>\d+)")?;
+/// let m = re.find("srv=8080").unwrap();
+/// assert_eq!(m.name("host"), Some("srv"));
+/// assert_eq!(m.group(2), Some("8080"));
+/// assert_eq!(m.span(), (0, 8));
+/// # Ok::<(), pregex::Error>(())
+/// ```
 pub struct Match<'h> {
     pub(crate) haystack: &'h str,
     pub(crate) char_to_byte: Vec<usize>,
@@ -99,7 +115,9 @@ impl<'h> Match<'h> {
             .get(g)
             .map(|v| {
                 v.iter()
-                    .map(|(s, e)| Some(&self.haystack[self.char_to_byte[*s]..self.char_to_byte[*e]]))
+                    .map(|(s, e)| {
+                        Some(&self.haystack[self.char_to_byte[*s]..self.char_to_byte[*e]])
+                    })
                     .collect()
             })
             .unwrap_or_default()
@@ -210,13 +228,7 @@ impl<'h> std::ops::Index<&str> for Match<'h> {
 impl<'h> std::fmt::Debug for Match<'h> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (s, e) = self.span();
-        write!(
-            f,
-            "Match {:?} span={}..{}",
-            &self.haystack[s..e],
-            s,
-            e
-        )
+        write!(f, "Match {:?} span={}..{}", &self.haystack[s..e], s, e)
     }
 }
 

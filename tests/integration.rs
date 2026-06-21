@@ -1,6 +1,6 @@
 //! Integration tests exercising the parser + matcher end to end.
 
-use pregex::{flags, Regex};
+use pregex::{Regex, flags};
 
 fn re(p: &str) -> Regex {
     Regex::new(p).expect(&format!("failed to compile {p:?}"))
@@ -87,7 +87,10 @@ fn negated_class() {
 #[test]
 fn predefined_classes() {
     assert_eq!(re(r"\d+").find("abc123").unwrap().as_str(), "123");
-    assert_eq!(re(r"\w+").find("hello_world!").unwrap().as_str(), "hello_world");
+    assert_eq!(
+        re(r"\w+").find("hello_world!").unwrap().as_str(),
+        "hello_world"
+    );
     assert_eq!(re(r"\s+").find("a   b").unwrap().as_str(), "   ");
     assert_eq!(re(r"\D+").find("123abc").unwrap().as_str(), "abc");
 }
@@ -320,7 +323,10 @@ fn repeated_captures() {
 fn repeated_named_captures() {
     let r = re(r"(?:(?P<word>\w+) )+");
     let m = r.find("one two three ").unwrap();
-    assert_eq!(m.captures_name("word"), vec![Some("one"), Some("two"), Some("three")]);
+    assert_eq!(
+        m.captures_name("word"),
+        vec![Some("one"), Some("two"), Some("three")]
+    );
 }
 
 // --- find_iter / split / replace ------------------------------------------
@@ -328,7 +334,10 @@ fn repeated_named_captures() {
 #[test]
 fn find_iter_non_overlapping() {
     let r = re(r"\d+");
-    let ms: Vec<_> = r.find_iter("a1 bb 22 ccc 333").map(|m| m.as_str().to_string()).collect();
+    let ms: Vec<_> = r
+        .find_iter("a1 bb 22 ccc 333")
+        .map(|m| m.as_str().to_string())
+        .collect();
     assert_eq!(ms, vec!["1", "22", "333"]);
 }
 

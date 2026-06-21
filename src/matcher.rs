@@ -1,7 +1,7 @@
 //! The backtracking matching engine.
 //!
 //! The engine is a recursive, continuation-passing backtracker over the
-//! [`Node`](crate::ast::Node) tree. Each node is asked to match at the current
+//! parsed AST node tree. Each node is asked to match at the current
 //! cursor position; on success it invokes a continuation `k` representing "the
 //! rest of the pattern". A choice point (alternation, repetition) saves state,
 //! tries one option, and restores state before trying the next.
@@ -34,7 +34,11 @@ pub fn m_node<'p>(node: &'p Node, st: &mut State, k: &Cont<'p>) -> bool {
         Node::LitStr { chars, ign } => m_litstr(chars, *ign, st, k),
         Node::Any { dotall } => m_any(*dotall, st, k),
         Node::Class { cc } => m_class(cc, st, k),
-        Node::Predef { kind, negated, ascii } => m_predef(*kind, *negated, *ascii, st, k),
+        Node::Predef {
+            kind,
+            negated,
+            ascii,
+        } => m_predef(*kind, *negated, *ascii, st, k),
         Node::Prop(p) => m_prop(p.pred, p.negated, st, k),
         Node::StartLine { multiline } => m_startline(*multiline, st, k),
         Node::EndLine { multiline } => m_endline(*multiline, st, k),
@@ -60,9 +64,18 @@ pub fn m_node<'p>(node: &'p Node, st: &mut State, k: &Cont<'p>) -> bool {
         Node::Atomic(node) => m_atomic(node, st, k),
         Node::Branch { alts } => m_branch(alts, st, k),
         Node::Sequence { items } => m_seq(items, 0, st, k),
-        Node::Repeat { node, min, max, greedy } => m_repeat(node, *min, *max, *greedy, st, k),
+        Node::Repeat {
+            node,
+            min,
+            max,
+            greedy,
+        } => m_repeat(node, *min, *max, *greedy, st, k),
         Node::BackRef { group, ign } => m_backref(*group, *ign, st, k),
-        Node::Look { behind, positive, node } => m_look(*behind, *positive, node, st, k),
+        Node::Look {
+            behind,
+            positive,
+            node,
+        } => m_look(*behind, *positive, node, st, k),
     }
 }
 
@@ -216,8 +229,7 @@ fn m_startline<'p>(multiline: bool, st: &mut State, k: &Cont<'p>) -> bool {
 
 fn m_endline<'p>(multiline: bool, st: &mut State, k: &Cont<'p>) -> bool {
     let at_end = st.pos == st.len();
-    let before_trailing_newline =
-        matches!(st.cur(), Some('\n')) && st.pos + 1 == st.len();
+    let before_trailing_newline = matches!(st.cur(), Some('\n')) && st.pos + 1 == st.len();
     let before_any_newline = multiline && matches!(st.cur(), Some('\n'));
     if at_end || before_trailing_newline || before_any_newline {
         k(st)
@@ -227,31 +239,35 @@ fn m_endline<'p>(multiline: bool, st: &mut State, k: &Cont<'p>) -> bool {
 }
 
 fn m_word_boundary<'p>(negated: bool, ascii: bool, st: &mut State, k: &Cont<'p>) -> bool {
-    let before = st.prev().map(|c| unicode::is_word(c, ascii)).unwrap_or(false);
-    let after = st.cur().map(|c| unicode::is_word(c, ascii)).unwrap_or(false);
+    let before = st
+        .prev()
+        .map(|c| unicode::is_word(c, ascii))
+        .unwrap_or(false);
+    let after = st
+        .cur()
+        .map(|c| unicode::is_word(c, ascii))
+        .unwrap_or(false);
     let boundary = before != after;
-    if boundary != negated {
-        k(st)
-    } else {
-        false
-    }
+    if boundary != negated { k(st) } else { false }
 }
 
 /// `\m` requires a word char ahead and a non-word char (or start) behind;
 /// `\M` requires the reverse.
 fn m_word_edge<'p>(end: bool, ascii: bool, st: &mut State, k: &Cont<'p>) -> bool {
-    let before = st.prev().map(|c| unicode::is_word(c, ascii)).unwrap_or(false);
-    let after = st.cur().map(|c| unicode::is_word(c, ascii)).unwrap_or(false);
+    let before = st
+        .prev()
+        .map(|c| unicode::is_word(c, ascii))
+        .unwrap_or(false);
+    let after = st
+        .cur()
+        .map(|c| unicode::is_word(c, ascii))
+        .unwrap_or(false);
     let ok = if end {
         before && !after
     } else {
         !before && after
     };
-    if ok {
-        k(st)
-    } else {
-        false
-    }
+    if ok { k(st) } else { false }
 }
 
 /// `\X` — approximate grapheme match: consume exactly one char. (Full
@@ -282,7 +298,12 @@ fn m_group<'p>(index: usize, node: &'p Node, st: &mut State, k: &Cont<'p>) -> bo
         // On a successful body completion, drop our entry (it is on top —
         // closes fire innermost-first) before closing, so any later
         // partial-block recorded downstream does not falsely include us.
-        if st.open_groups.last().map(|&(i, _)| i == idx).unwrap_or(false) {
+        if st
+            .open_groups
+            .last()
+            .map(|&(i, _)| i == idx)
+            .unwrap_or(false)
+        {
             st.open_groups.pop();
         }
         st.close_group(idx, start);
@@ -293,7 +314,12 @@ fn m_group<'p>(index: usize, node: &'p Node, st: &mut State, k: &Cont<'p>) -> bo
         // The whole group attempt failed. Choice points inside the body will
         // have restored `open_groups` via snapshots taken after our push, so
         // our entry is typically still on top here — drop it if so.
-        if st.open_groups.last().map(|&(i, _)| i == index).unwrap_or(false) {
+        if st
+            .open_groups
+            .last()
+            .map(|&(i, _)| i == index)
+            .unwrap_or(false)
+        {
             st.open_groups.pop();
         }
     }

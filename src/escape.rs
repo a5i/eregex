@@ -40,21 +40,32 @@ fn escape_impl(s: &str, special_only: bool, literal_spaces: bool) -> String {
     for c in s.chars() {
         let is_special = matches!(
             c,
-            '.' | '^' | '$' | '*' | '+' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | '\\'
-                | '|'
+            '.' | '^' | '$' | '*' | '+' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | '\\' | '|'
         );
         let is_space = c == ' ';
         let is_punct = matches!(
             c,
-            '!' | '"' | '#' | '%' | '&' | '\'' | ',' | ':' | ';' | '<' | '=' | '>' | '@'
-                | '`' | '~' | '/'
+            '!' | '"'
+                | '#'
+                | '%'
+                | '&'
+                | '\''
+                | ','
+                | ':'
+                | ';'
+                | '<'
+                | '='
+                | '>'
+                | '@'
+                | '`'
+                | '~'
+                | '/'
         );
         // * regex metacharacters are always escaped;
         // * space is escaped unless `literal_spaces` is true;
         // * other punctuation is escaped unless `special_only` is true.
-        let escape_this = is_special
-            || (is_space && !literal_spaces)
-            || (is_punct && !special_only);
+        let escape_this =
+            is_special || (is_space && !literal_spaces) || (is_punct && !special_only);
         if escape_this {
             out.push('\\');
         }

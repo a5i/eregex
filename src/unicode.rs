@@ -100,12 +100,36 @@ pub fn property(name: &str) -> Option<PropFn> {
         ("", "lu") | ("gc", "lu") | ("", "uppercaseletter") => |c| c.is_uppercase(),
         ("", "ll") | ("gc", "ll") | ("", "lowercaseletter") => |c| c.is_lowercase(),
         ("", "n") | ("gc", "n") | ("", "number") => |c| c.is_numeric(),
-        ("", "nd") | ("gc", "nd") | ("generalcategory", "nd") | ("", "decimalnumber") => |c| c.is_numeric(),
+        ("", "nd") | ("gc", "nd") | ("generalcategory", "nd") | ("", "decimalnumber") => {
+            |c| c.is_numeric()
+        }
         ("", "nl") | ("gc", "nl") | ("", "letternumber") => |c| c.is_numeric(),
         ("", "no") | ("gc", "no") | ("", "othernumber") => |c| c.is_numeric(),
-        ("", "p") | ("gc", "p") | ("", "punctuation") => {
-            |c| matches!(c, '?'|'!'|'.'|','|';'|':'|'-'|'—'|'(' | ')'|'['|']'|'{'|'}'|'"'|'\''|'`'|'/'|'\\'|'…'|'‥')
-        }
+        ("", "p") | ("gc", "p") | ("", "punctuation") => |c| {
+            matches!(
+                c,
+                '?' | '!'
+                    | '.'
+                    | ','
+                    | ';'
+                    | ':'
+                    | '-'
+                    | '—'
+                    | '('
+                    | ')'
+                    | '['
+                    | ']'
+                    | '{'
+                    | '}'
+                    | '"'
+                    | '\''
+                    | '`'
+                    | '/'
+                    | '\\'
+                    | '…'
+                    | '‥'
+            )
+        },
         ("", "z") | ("gc", "z") | ("", "separator") => {
             |c| matches!(c, ' ' | '\u{00a0}' | '\u{2028}' | '\u{2029}')
         }
@@ -127,7 +151,10 @@ pub fn property(name: &str) -> Option<PropFn> {
         // POSIX-style aliases (mrab-specific forms), normalized to no-underscore.
         ("", "posixalnum") => |c| c.is_alphanumeric(),
         ("", "posixdigit") => |c| c.is_numeric(),
-        ("", "posixpunct") => |c| c.is_ascii_punctuation() || "\u{2010}\u{2011}\u{2012}\u{2013}\u{2014}\u{2015}\u{2212}".contains(c),
+        ("", "posixpunct") => |c| {
+            c.is_ascii_punctuation()
+                || "\u{2010}\u{2011}\u{2012}\u{2013}\u{2014}\u{2015}\u{2212}".contains(c)
+        },
         ("", "posixxdigit") => |c| c.is_ascii_hexdigit(),
         _ => return None,
     };

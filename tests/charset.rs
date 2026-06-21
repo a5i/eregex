@@ -141,5 +141,8 @@ fn de_morgan_union() {
     let a = CharSet::from_range('a', 'f');
     let b = CharSet::from_range('d', 'k');
     // !(a ∪ b) == !a ∩ !b
-    assert_eq!(a.union(&b).complement(), a.complement().intersect(&b.complement()));
+    assert_eq!(
+        a.union(&b).complement(),
+        a.complement().intersect(&b.complement())
+    );
 }

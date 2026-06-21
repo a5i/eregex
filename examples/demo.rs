@@ -1,6 +1,6 @@
 //! A small demonstration of the pregex API.
 
-use pregex::{flags, Regex};
+use pregex::{Regex, flags};
 
 fn main() {
     let re = Regex::new(r"(?P<word>\w+)\s+(?P<num>\d+)").unwrap();

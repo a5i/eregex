@@ -24,12 +24,16 @@ impl CharSet {
 
     /// The set of every codepoint.
     pub fn full() -> Self {
-        CharSet { ranges: vec![(0, MAX_CP)] }
+        CharSet {
+            ranges: vec![(0, MAX_CP)],
+        }
     }
 
     /// Create a set containing a single codepoint.
     pub fn from_char(c: char) -> Self {
-        CharSet { ranges: vec![(c as u32, c as u32)] }
+        CharSet {
+            ranges: vec![(c as u32, c as u32)],
+        }
     }
 
     /// Create a set from an inclusive codepoint range.
