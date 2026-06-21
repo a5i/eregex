@@ -1,7 +1,12 @@
 {
   "name": "@a5i/eregex",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Node.js bindings for eregex, an advanced regular expression engine inspired by mrab-regex",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/a5i/eregex",
+    "directory": "crates/eregex-node"
+  },
   "main": "index.js",
   "types": "index.d.ts",
   "license": "Apache-2.0",
