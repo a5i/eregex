@@ -10,6 +10,12 @@
 // `wasm-bindgen` itself is FFI glue and uses `unsafe` internally, but none of
 // the code in *this* file does. `deny` lets the generated traits override the
 // lint where they must, while still flagging any `unsafe` we add ourselves.
+//
+// Portability gotcha: `wasm-bindgen` does NOT convert `snake_case` to
+// `camelCase` (unlike `napi-rs`, which does). So every multi-word Rust
+// identifier exported to JS must carry an explicit `#[wasm_bindgen(...
+// js_name = camelCase)]`. Single-word names (`pattern`, `flags`, `find`, ...)
+// are identical on both sides and need no `js_name`.
 
 #![deny(unsafe_code)]
 
@@ -26,12 +32,25 @@ use wasm_bindgen::prelude::*;
 ///
 /// We route every nullable / compound return through this (rather than letting
 /// `wasm-bindgen` convert `Option<T>` directly) so that `None` becomes JS
-/// `null` — matching the native napi-rs bindings. `wasm-bindgen`'s native
-/// `Option<T>` mapping yields `undefined`, which would break `=== null` and
-/// `deepStrictEqual(..., null)` for anyone treating this package as a drop-in
-/// for `eregex`.
+/// `null` — matching the native napi-rs bindings. Two things must be set up
+/// for that:
+///
+/// * `wasm-bindgen`'s native `Option<T>` mapping yields `undefined` (its
+///   `OptionIntoWasmAbi` impl produces `undefined` for `None`), which would
+///   break `=== null` and `deepStrictEqual(..., null)` for anyone treating
+///   this package as a drop-in for `eregex`.
+/// * `serde-wasm-bindgen`'s default `Serializer` *also* serializes `None` to
+///   `undefined` (`serialize_missing_as_null` defaults to `false`), and maps
+///   to ES2015 `Map`s instead of plain objects (`serialize_maps_as_objects`
+///   defaults to `false`). We enable both options so `None`/`()`/unit become
+///   `null` and `namedGroups` / `capturesDict` become plain objects — matching
+///   napi and making the results JSON-serializable.
 fn to_js<T: Serialize>(value: &T) -> JsValue {
-    serde_wasm_bindgen::to_value(value)
+    let serializer = serde_wasm_bindgen::Serializer::new()
+        .serialize_missing_as_null(true)
+        .serialize_maps_as_objects(true);
+    value
+        .serialize(&serializer)
         .expect("eregex-wasm: serializing a plain value to JsValue cannot fail")
 }
 
@@ -153,7 +172,7 @@ impl Regex {
 
     /// The number of capturing groups (group 0 is the whole match and is not
     /// counted here).
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = captureCount)]
     pub fn capture_count(&self) -> u32 {
         self.re.capture_count() as u32
     }
@@ -376,7 +395,7 @@ impl Match {
     }
 
     /// The number of capturing groups (group 0 not counted).
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = captureCount)]
     pub fn capture_count(&self) -> u32 {
         self.groups.len().saturating_sub(1) as u32
     }
@@ -583,7 +602,7 @@ impl PartialMatch {
     }
 
     /// The number of capturing groups (group 0 not counted).
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = captureCount)]
     pub fn capture_count(&self) -> u32 {
         self.group_text.len().saturating_sub(1) as u32
     }
