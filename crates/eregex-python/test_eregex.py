@@ -151,6 +151,58 @@ class TestPartial(unittest.TestCase):
         self.assertIsNone(self.re.find_partial("x token=abc!"))
 
 
+class TestPartialAdvanced(unittest.TestCase):
+    """Offsets, capture_count, all three group states, named groups, and the
+    incremental-typing progression."""
+
+    def setUp(self):
+        # Three groups, so a partial input exercises matched/partial/none at once.
+        self.re = P.Regex(r"token=([a-z]+)([0-9]+)([A-Z]+)")
+
+    def test_offsets_and_capture_count(self):
+        p = self.re.find_partial("x token=abc")
+        self.assertEqual(p.start, 2)            # byte offset of the match
+        self.assertEqual(p.end, 11)             # end == input length (end-anchored)
+        self.assertEqual(p.capture_count, 3)    # excludes group 0
+        self.assertEqual(p.group(0), "token=abc")
+
+    def test_all_three_group_states(self):
+        p = self.re.find_partial("x token=abc")
+        self.assertEqual(p.group_state(0), "matched")   # whole match
+        self.assertEqual(p.group_state(1), "matched")   # fully matched
+        self.assertEqual(p.group(2), "")                # entered, empty so far
+        self.assertEqual(p.group_state(2), "partial")
+        self.assertIsNone(p.group(3))                   # never entered
+        self.assertEqual(p.group_state(3), "none")
+
+    def test_out_of_range_group(self):
+        p = self.re.find_partial("x token=abc")
+        self.assertIsNone(p.group(99))
+        self.assertEqual(p.group_state(99), "none")
+
+    def test_full_match_all_groups_matched(self):
+        p = self.re.find_partial("token=abc123XYZ")
+        self.assertTrue(p.is_full)
+        self.assertEqual(p.status, "full")
+        self.assertEqual(p.matched, "token=abc123XYZ")
+        self.assertEqual(p.group_state(3), "matched")
+
+    def test_incremental_typing_progression(self):
+        re = P.Regex(r"abc")
+        self.assertIsNone(re.find_partial(""))        # nothing started yet
+        self.assertEqual(re.find_partial("a").status, "partial")
+        self.assertEqual(re.find_partial("ab").status, "partial")
+        self.assertTrue(re.find_partial("abc").is_full)
+        self.assertIsNone(re.find_partial("abcd"))    # hard mismatch
+
+    def test_named_groups_on_partial(self):
+        re = P.Regex(r"token=(?P<word>[a-z]+)(?P<num>[0-9]+)")
+        p = re.find_partial("token=ab")
+        self.assertEqual(p.named_group("word"), "ab")  # matched
+        self.assertEqual(p.named_group("num"), "")     # partial (empty so far)
+        self.assertIsNone(p.named_group("missing"))
+
+
 class TestHelpers(unittest.TestCase):
     def test_escape(self):
         self.assertEqual(P.escape("a.b*c"), r"a\.b\*c")

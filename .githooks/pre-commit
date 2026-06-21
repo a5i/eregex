@@ -1,44 +1,158 @@
 #!/usr/bin/env bash
-# Pre-commit hook: enforce `cargo fmt --check` and `cargo test` before a commit
-# lands. Shared with collaborators via the repo; each clone opts in once with:
+# Pre-commit hook: format check + the full test matrix — core Rust and the
+# Python, Node, and WASM (nodejs target) bindings — before a commit lands.
 #
+# Each suite runs only when its relevant files are staged, and is skipped
+# gracefully if its toolchain isn't installed, so a contributor without
+# Python/maturin/wasm-pack isn't blocked. A change to the shared Rust core
+# fans out to every binding, because they all wrap it.
+#
+# Enable once per clone:
 #     git config core.hooksPath .githooks
-#
-# Bypass for a single commit with `git commit --no-verify`.
+# Bypass a single commit with:
+#     git commit --no-verify
 
 set -euo pipefail
 
 if [ -t 1 ]; then
-    GREEN=$'\033[0;32m'; YELLOW=$'\033[0;33m'; RED=$'\033[0;31m'; NC=$'\033[0m'
+    GREEN=$'\033[0;32m'; YELLOW=$'\033[0;33m'; RED=$'\033[0;31m'; CYAN=$'\033[0;36m'; NC=$'\033[0m'
 else
-    GREEN=''; YELLOW=''; RED=''; NC=''
+    GREEN=''; YELLOW=''; RED=''; CYAN=''; NC=''
 fi
 
-info() { printf '%s[pre-commit]%s %s\n' "$GREEN" "$NC" "$*"; }
+info() { printf '%s[pre-commit]%s %s\n' "$CYAN"  "$NC" "$*"; }
+ok()   { printf '%s[pre-commit]%s %s\n' "$GREEN" "$NC" "$*"; }
 warn() { printf '%s[pre-commit]%s %s\n' "$YELLOW" "$NC" "$*"; }
 fail() { printf '%s[pre-commit]%s %s\n' "$RED" "$NC" "$*" >&2; }
 
-# Skip entirely when no Rust sources / manifests are staged.
-if ! git diff --cached --name-only --diff-filter=ACMR \
-        | grep -qE '\.(rs|toml)$|^Cargo\.lock$'; then
-    info "No Rust files staged, skipping checks."
+now()     { date +%s; }
+elapsed() { printf '%ss' "$(( $(now) - $1 ))"; }   # elapsed <start-secs>
+
+# --- decide which suites to run, based on staged files ---------------------
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR || true)
+touched() { printf '%s\n' "$STAGED" | grep -qE "$1"; }
+
+# Core Rust: the engine itself, plus the workspace manifests and the shared
+# lockfile. A change here can affect every binding (they wrap the core), so it
+# fans out to all four suites. Scoped to core paths so that editing a binding's
+# own `crates/eregex-*/src/*.rs` only runs that binding's suite, not the whole
+# matrix. (`^[^/]+\.rs$` catches any root-level `.rs` defensively.)
+CORE_RX='(^src/)|(^examples/)|(^tests/)|(^Cargo\.toml$)|(^Cargo\.lock$)|(^[^/]+\.rs$)'
+NODE_RX='^crates/eregex-node/'
+PY_RX='^crates/eregex-python/'
+WASM_RX='^crates/eregex-wasm/'
+
+run_core=false; run_node=false; run_py=false; run_wasm=false
+if touched "$CORE_RX"; then run_core=true; run_node=true; run_py=true; run_wasm=true; fi
+touched "$NODE_RX" && run_node=true
+touched "$PY_RX"   && run_py=true
+touched "$WASM_RX" && run_wasm=true
+
+if [ "$run_core" = false ] && [ "$run_node" = false ] && \
+   [ "$run_py" = false ]   && [ "$run_wasm" = false ]; then
+    info "No Rust or binding sources staged, skipping checks."
     exit 0
 fi
 
-info "Running 'cargo fmt --all --check'..."
-if ! cargo fmt --all --check; then
-    fail "Formatting check failed."
-    warn "Fix with:    cargo fmt --all"
-    warn "Or bypass:   git commit --no-verify"
+# --- fmt check (cheap; runs whenever any Rust file is staged) ---------------
+if touched '\.rs$'; then
+    info "Running 'cargo fmt --all --check'..."
+    if ! cargo fmt --all --check; then
+        fail "Formatting check failed."
+        warn "Fix with:  cargo fmt --all"
+        warn "Bypass:    git commit --no-verify"
+        exit 1
+    fi
+    ok "fmt ok"
+fi
+
+# --- 1. core Rust ----------------------------------------------------------
+# Runs first because every binding compiles the core too; if it is broken the
+# binding builds would just re-report the same error (and waste their build
+# time), so we bail out here instead of fanning out.
+if [ "$run_core" = true ]; then
+    t=$(now); info "Running 'cargo test --workspace' (core)..."
+    if cargo test --workspace --quiet; then
+        ok "core tests passed ($(elapsed "$t"))"
+    else
+        fail "Core tests failed — skipping binding suites (they wrap the core)."
+        warn "Fix the core, or bypass with: git commit --no-verify"
+        exit 1
+    fi
+fi
+
+failed=0
+
+# --- 2. Python bindings ----------------------------------------------------
+if [ "$run_py" = true ]; then
+    PY_DIR=crates/eregex-python
+    PYBIN_REL=""
+    # Cross-platform venv lookup: Windows lays binaries under Scripts/, Unix
+    # under bin/. Stored relative to the crate dir because the subshell cd's
+    # there (maturin develop needs the crate's Cargo.toml). Existence is
+    # checked from the repo root by prefixing the crate dir.
+    for rel in ".venv/Scripts/python.exe" ".venv/bin/python"; do
+        if [ -x "$PY_DIR/$rel" ]; then PYBIN_REL="$rel"; break; fi
+    done
+    if [ -n "$PYBIN_REL" ]; then
+        t=$(now); info "Building + testing Python bindings (maturin develop)..."
+        if ( cd "$PY_DIR" \
+                && "./$PYBIN_REL" -m maturin develop --release --quiet \
+                && "./$PYBIN_REL" -m unittest test_eregex ); then
+            ok "python tests passed ($(elapsed "$t"))"
+        else
+            fail "Python tests failed."
+            failed=1
+        fi
+    else
+        warn "Skipping Python tests: no venv at $PY_DIR/.venv"
+        warn "  set one up: python -m venv $PY_DIR/.venv, then inside it:"
+        warn "    pip install maturin   # then: .venv/Scripts/python  or  .venv/bin/python"
+    fi
+fi
+
+# --- 3. Node bindings ------------------------------------------------------
+if [ "$run_node" = true ]; then
+    if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+        t=$(now); info "Building + testing Node bindings (napi-rs)..."
+        # `npm ci` on a fresh clone (node_modules is gitignored); no-op-fast on
+        # subsequent commits because the lockfile is unchanged.
+        if ( cd crates/eregex-node \
+                && { [ -d node_modules ] || npm ci --silent; } \
+                && npm run build --silent \
+                && npm test ); then
+            ok "node tests passed ($(elapsed "$t"))"
+        else
+            fail "Node tests failed."
+            failed=1
+        fi
+    else
+        warn "Skipping Node tests: node/npm not installed."
+    fi
+fi
+
+# --- 4. WASM (nodejs target) bindings --------------------------------------
+if [ "$run_wasm" = true ]; then
+    if command -v wasm-pack >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
+        t=$(now); info "Building + testing WASM bindings (wasm-pack)..."
+        # `npm run build` = wasm-pack build --target nodejs + assemble-pkg.cjs
+        # (no node_modules needed — wasm-pack is a cargo binary, the assemble
+        # script is plain node).
+        if ( cd crates/eregex-wasm && npm run build --silent && npm test ); then
+            ok "wasm tests passed ($(elapsed "$t"))"
+        else
+            fail "WASM tests failed."
+            failed=1
+        fi
+    else
+        warn "Skipping WASM tests: wasm-pack not installed (cargo install wasm-pack)."
+    fi
+fi
+
+if [ "$failed" -ne 0 ]; then
+    fail "One or more suites failed. Fix them, or bypass with: git commit --no-verify"
     exit 1
 fi
 
-info "Running 'cargo test --workspace'..."
-if ! cargo test --workspace --quiet; then
-    fail "Tests failed."
-    warn "Fix the failing tests, or bypass with: git commit --no-verify"
-    exit 1
-fi
-
-info "All checks passed."
+ok "All checks passed."
 exit 0

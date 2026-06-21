@@ -1,4 +1,4 @@
-// Type definitions for `eregex-wasm`.
+// Type definitions for `@a5i/eregex-wasm`.
 //
 // Re-exports everything the wasm-bindgen glue declares (`Regex`, `Match`,
 // `PartialMatch`, `parseFlags`, `escape`, ...) and adds the flag *constants*,

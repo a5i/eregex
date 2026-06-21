@@ -1,4 +1,4 @@
-# eregex-wasm
+# @a5i/eregex-wasm
 
 WebAssembly bindings for [`eregex`](https://github.com/a5i/eregex) — an
 advanced regular expression engine for Rust inspired by mrab-regex (the Python
@@ -9,15 +9,15 @@ This package exposes eregex's full API to JavaScript / TypeScript via
 All matching logic runs in compiled Rust shipped as a single `.wasm` artifact;
 the JavaScript layer is a thin adapter.
 
-It mirrors the native Node bindings ([`eregex`](https://www.npmjs.com/package/eregex),
+It mirrors the native Node bindings ([`@a5i/eregex`](https://www.npmjs.com/package/@a5i/eregex),
 napi-rs) method-for-method: the same `Regex` / `Match` / `PartialMatch`
 classes, the same flag constants, the same `null`-on-absent semantics. Code
 written against one works unchanged against the other.
 
-| package     | engine     | best for                                  |
-| ----------- | ---------- | ----------------------------------------- |
-| `eregex`     | napi-rs    | fastest native execution on Node          |
-| `eregex-wasm`| wasm-bindgen | a single portable binary; also bundler/browser-buildable |
+| package          | technology                  | best for                                  |
+| ---------------- | --------------------------- | ----------------------------------------- |
+| `@a5i/eregex`     | napi-rs    | fastest native execution on Node          |
+| `@a5i/eregex-wasm`| wasm-bindgen | a single portable binary; also bundler/browser-buildable |
 
 ## Build
 
@@ -41,7 +41,7 @@ The `pkg/` directory is generated; it is not checked in.
 ## Quick start
 
 ```js
-const { Regex, IGNORECASE, parseFlags } = require('eregex-wasm');
+const { Regex, IGNORECASE, parseFlags } = require('@a5i/eregex-wasm');
 
 const re = new Regex(String.raw`(\w+)\s+(\w+)`);
 const m = re.find('hello world');
@@ -169,7 +169,7 @@ flags(): { IGNORECASE: number; MULTILINE: number; /* ... */ }
   it loads as a plain CommonJS module in Node 10+ with no bundler required.
 - `wasm-bindgen` cannot export `const` values, so the flag bits are produced
   by `flags()` and spread onto the module by `index.js`. Callers see ordinary
-  numeric properties (`eregex-wasm.IGNORECASE`, ...).
+  numeric properties (`@a5i/eregex-wasm.IGNORECASE`, ...).
 - Absent values come back as JS `null` (not `undefined`): nullable returns are
   routed through `serde-wasm-bindgen`, which maps `Option::None → null`, so
   `=== null` and `deepStrictEqual(..., null)` behave exactly like the native
@@ -188,7 +188,7 @@ npm run test:all  # build, then test
 ## Layout
 
 This is one facet of eregex's binding story. The same Rust core (`eregex`)
-also ships native Node bindings (`eregex`, napi-rs) and Python bindings
+also ships native Node bindings (`@a5i/eregex`, napi-rs) and Python bindings
 (`eregex`, pyo3). See the project root for the core crate and its feature
 matrix.
 

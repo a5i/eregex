@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **WASM bindings** (`crates/eregex-wasm`): a `wasm-bindgen` / `wasm-pack`
-  package (published as `eregex-wasm` on npm) that exposes the same API as the
+  package (published as `@a5i/eregex-wasm` on npm) that exposes the same API as the
   native Node bindings, built with `--target nodejs`. Absent values serialize
   to JS `null` via `serde-wasm-bindgen` (not `undefined`), so it is a drop-in
   for the napi-rs package; a hand-written `index.js` entry materializes the

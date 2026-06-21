@@ -135,8 +135,8 @@ The Rust core is wrapped by three companion crates, each under `crates/`:
 
 | package            | technology                  | install                |
 | ------------------ | --------------------------- | ---------------------- |
-| `eregex` (npm)     | `napi-rs` (native addon)    | `npm i eregex`         |
-| `eregex-wasm` (npm)| `wasm-bindgen` / `wasm-pack`| `npm i eregex-wasm`    |
+| `@a5i/eregex` (npm)     | `napi-rs` (native addon)    | `npm i @a5i/eregex`         |
+| `@a5i/eregex-wasm` (npm)| `wasm-bindgen` / `wasm-pack`| `npm i @a5i/eregex-wasm`    |
 | `eregex` (PyPI)    | `pyo3` / `maturin`          | `pip install eregex`   |
 
 The Node and WASM packages expose the **same JavaScript API** (`Regex`,
@@ -147,14 +147,45 @@ also be rebuilt for bundlers / browsers (`wasm-pack build --target web`).
 
 ## Development
 
-A shared pre-commit hook runs `cargo fmt --all --check` and
-`cargo test --workspace` before each commit. Enable it once per clone:
+A shared pre-commit hook (`.githooks/pre-commit`) runs the full test matrix
+before each commit: `cargo fmt --all --check`, then `cargo test --workspace`
+(core), plus the **Python**, **Node**, and **WASM** binding smoke suites.
+
+The hook is gated on what you stage, so it stays fast:
+
+- a change to the shared **core** (`src/`, `examples/`, `tests/`, root `*.rs`,
+  `Cargo.toml`, `Cargo.lock`) fans out to **all four** suites, since every
+  binding wraps the core;
+- a change to a single binding crate (`crates/eregex-{node,python,wasm}/`)
+  runs only that binding's suite (plus `cargo fmt` on any `.rs`);
+- docs-only changes skip everything.
+
+Each binding suite is skipped gracefully if its toolchain isn't installed
+(Python venv at `crates/eregex-python/.venv`, `wasm-pack`, `node`/`npm`), so a
+contributor who only works on one layer isn't blocked.
+
+Enable it once per clone:
 
 ```sh
 git config core.hooksPath .githooks
 ```
 
 Bypass it for a single commit with `git commit --no-verify`.
+
+Setting up the optional binding toolchains (so the hook runs every suite):
+
+```sh
+# Node (already installed if you `npm ci` in crates/eregex-node)
+cd crates/eregex-node && npm ci
+
+# WASM (cargo binary)
+cargo install wasm-pack
+
+# Python (local venv used by the hook)
+python -m venv crates/eregex-python/.venv
+crates/eregex-python/.venv/Scripts/python -m pip install maturin   # Windows
+crates/eregex-python/.venv/bin/python -m pip install maturin       # Unix
+```
 
 ## Compatibility
 

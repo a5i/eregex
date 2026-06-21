@@ -134,9 +134,24 @@ class Match:
 All offsets are **byte offsets** (UTF-8), matching Python's `re` and the Rust
 core. `None` is returned for groups that did not participate.
 
-## `PartialMatch`
+## Partial matching
 
-`find_partial` is end-anchored: the match must consume the input to its end.
+`find_partial` is an **end-anchored** search: it asks whether the haystack,
+taken up to its end, could be the start of a full match. Use it when
+validating input as the user types, parsing an incomplete stream, or asking
+"could more input turn this into a match?"
+
+It returns one of three outcomes:
+
+| result                  | meaning                                                        |
+| ----------------------- | ------------------------------------------------------------- |
+| `PartialMatch` (partial) | a valid prefix so far — more input could complete it          |
+| `PartialMatch` (full)    | the input already fully matches (and consumes it to its end)  |
+| `None`                  | a hard mismatch: no possible continuation could match         |
+
+Each capturing group in a partial match is itself in one of three states,
+reported by `group_state(i)`: `"matched"` (fully matched), `"partial"` (entered
+but not yet completed), or `"none"` (never participated — `group(i)` is `None`).
 
 ```python
 class PartialMatch:
@@ -149,9 +164,9 @@ class PartialMatch:
     @property
     def matched(self) -> str
     @property
-    def start(self) -> int
+    def start(self) -> int                 # byte offset where the match starts
     @property
-    def end(self) -> int
+    def end(self) -> int                   # byte offset of the input end (always len(haystack))
     @property
     def capture_count(self) -> int
 
@@ -160,19 +175,44 @@ class PartialMatch:
     def group_state(self, index: int = 0) -> str   # "matched" | "partial" | "none"
 ```
 
-- `None` from `find_partial` → the input **cannot** be a prefix of any match.
-- `status == "partial"` → the input is a valid prefix of some full match
-  (more input could complete it).
+Incremental typing graduates `partial` → `full` → `None`:
 
 ```python
-re = eregex.Regex(r"token=([a-z]+)([0-9]+)")
-p = re.find_partial("x token=abc")
-p.is_partial           # True
-p.group(1)             # 'abc'
-p.group_state(1)       # 'matched'
-p.group_state(2)       # 'partial'  (entered but not completed)
+re = eregex.Regex(r"abc")
+re.find_partial("")    # None      (nothing started yet)
+re.find_partial("a")   # partial   .status == "partial"
+re.find_partial("ab")  # partial
+re.find_partial("abc") # full      .is_full
+re.find_partial("abcd")# None      ('d' rules out any continuation)
+```
 
-re.find_partial("x token=abc!")  # None — '!' rules out any continuation
+Group states as a match fills in. With `token=([a-z]+)([0-9]+)([A-Z]+)`:
+
+```python
+re = eregex.Regex(r"token=([a-z]+)([0-9]+)([A-Z]+)")
+p = re.find_partial("x token=abc")
+
+p.is_partial           # True
+p.matched              # 'token=abc'
+p.start                # 2    (byte offset of the match)
+p.end                  # 11   (end of input — always, since end-anchored)
+p.capture_count        # 3
+
+p.group(1)             # 'abc'   p.group_state(1) # 'matched'
+p.group(2)             # ''      p.group_state(2) # 'partial'  (entered, empty so far)
+p.group(3)             # None    p.group_state(3) # 'none'     (never entered)
+
+re.find_partial("token=abc123XYZ")  # group 3 -> 'matched', status 'full'
+re.find_partial("x token=abc!")     # None   ('!' rules out any continuation)
+```
+
+Named groups work the same way:
+
+```python
+re = eregex.Regex(r"token=(?P<word>[a-z]+)(?P<num>[0-9]+)")
+p = re.find_partial("token=ab")
+p.named_group("word")  # 'ab'   (matched)
+p.named_group("num")   # ''     (partial — empty so far)
 ```
 
 ## Module-level helpers

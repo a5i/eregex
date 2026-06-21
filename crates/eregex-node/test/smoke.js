@@ -72,22 +72,58 @@ eq(replacer.replaceAll('12 34', '${b}${a}'), '21 43', 'replaceAll');
 eq(new P.Regex(String.raw`\s+`).split('a  b c'), ['a', 'b', 'c'], 'split');
 
 // --- partial matching -----------------------------------------------------
+// findPartial is end-anchored: the match must consume the input to its end.
+// It reports a full match, a valid prefix of one, or a hard mismatch (null).
 
-const pRe = new P.Regex(String.raw`token=([a-z]+)([0-9]+)`);
+// Incremental typing graduates partial -> full -> null.
+const abc = new P.Regex(String.raw`abc`);
+eq(abc.findPartial(''), null, 'partial: empty input -> null (nothing started)');
+eq(abc.findPartial('a').status, 'partial', 'partial: "a" -> partial');
+eq(abc.findPartial('ab').status, 'partial', 'partial: "ab" -> partial');
+eq(abc.findPartial('abc').isFull, true, 'partial: "abc" -> full');
+eq(abc.findPartial('abcd'), null, 'partial: "abcd" -> null (hard mismatch)');
+
+// Group states: matched / partial / none, plus offsets + captureCount.
+const pRe = new P.Regex(String.raw`token=([a-z]+)([0-9]+)([A-Z]+)`);
 const partial = pRe.findPartial('x token=abc');
-assert.ok(partial, 'findPartial result');
-assert.ok(partial.isPartial, 'isPartial');
-eq(partial.status, 'partial', 'status string');
-eq(partial.matched, 'token=abc', 'partial matched');
-eq(partial.group(1), 'abc', 'partial group 1 (matched)');
-eq(partial.groupState(1), 'matched', 'group 1 state');
-eq(partial.groupState(2), 'partial', 'group 2 state');
+assert.ok(partial, 'partial: findPartial result');
+eq(partial.status, 'partial', 'partial: status string');
+assert.ok(partial.isPartial, 'partial: isPartial');
+assert.ok(!partial.isFull, 'partial: not isFull');
+eq(partial.matched, 'token=abc', 'partial: matched text');
+eq(partial.start, 2, 'partial: start byte offset');
+eq(partial.end, 11, 'partial: end = input length (end-anchored)');
+eq(partial.captureCount, 3, 'partial: captureCount excludes group 0');
+// group 1 fully matched
+eq(partial.group(1), 'abc', 'partial: group 1 text');
+eq(partial.groupState(1), 'matched', 'partial: group 1 state');
+// group 2 entered but not completed (empty so far)
+eq(partial.group(2), '', 'partial: group 2 text (empty so far)');
+eq(partial.groupState(2), 'partial', 'partial: group 2 state');
+// group 3 never entered
+eq(partial.group(3), null, 'partial: group 3 -> null (never entered)');
+eq(partial.groupState(3), 'none', 'partial: group 3 state');
+// whole-match and out-of-range states
+eq(partial.groupState(0), 'matched', 'partial: group 0 (whole match) state');
+eq(partial.groupState(99), 'none', 'partial: out-of-range state -> none');
+eq(partial.group(99), null, 'partial: out-of-range group -> null');
 
-const full = pRe.findPartial('token=abc123');
-assert.ok(full.isFull, 'findPartial full');
-eq(full.status, 'full', 'full status');
+// A full match: all participating groups 'matched'.
+const full = pRe.findPartial('token=abc123XYZ');
+eq(full.status, 'full', 'partial: full status');
+assert.ok(full.isFull, 'partial: isFull');
+eq(full.matched, 'token=abc123XYZ', 'partial: full matched');
+eq(full.groupState(3), 'matched', 'partial: full group 3 matched');
 
-eq(pRe.findPartial('x token=abc!'), null, 'hard mismatch -> null');
+// Hard mismatch: a wrong character rules out any continuation.
+eq(pRe.findPartial('x token=abc!'), null, 'partial: hard mismatch -> null');
+
+// Named groups on a partial match.
+const namedP = new P.Regex(String.raw`token=(?P<word>[a-z]+)(?P<num>[0-9]+)`);
+const pn = namedP.findPartial('token=ab');
+eq(pn.namedGroup('word'), 'ab', 'partial: named group matched');
+eq(pn.namedGroup('num'), '', 'partial: named group partial (empty so far)');
+eq(pn.namedGroup('missing'), null, 'partial: missing named group -> null');
 
 // --- module-level helpers -------------------------------------------------
 

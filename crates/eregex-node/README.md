@@ -1,4 +1,4 @@
-# eregex (Node.js bindings)
+# @a5i/eregex (Node.js bindings)
 
 Native Node.js bindings for [`eregex`](https://github.com/a5i/eregex) —
 an advanced regular expression engine for Rust inspired by mrab-regex (the
@@ -37,7 +37,7 @@ they are not checked in.
 ## Quick start
 
 ```js
-const { Regex, IGNORECASE, parseFlags } = require('eregex');
+const { Regex, IGNORECASE, parseFlags } = require('@a5i/eregex');
 
 const re = new Regex(String.raw`(\w+)\s+(\w+)`);
 const m = re.find('hello world');
@@ -113,9 +113,24 @@ class Match {
 All offsets are **byte offsets** (UTF-8), matching Python's `re` and the Rust
 core. `null` is returned for groups that did not participate.
 
-## `PartialMatch`
+## Partial matching
 
-`findPartial` is end-anchored: the match must consume the input to its end.
+`findPartial` is an **end-anchored** search: it asks whether the haystack,
+taken up to its end, could be the start of a full match. Use it when
+validating input as the user types, parsing an incomplete stream, or asking
+"could more input turn this into a match?"
+
+It returns one of three outcomes:
+
+| result                   | meaning                                                        |
+| ------------------------ | ------------------------------------------------------------- |
+| `PartialMatch` (partial) | a valid prefix so far — more input could complete it           |
+| `PartialMatch` (full)    | the input already fully matches (and consumes it to its end)  |
+| `null`                   | a hard mismatch: no possible continuation could match         |
+
+Each capturing group in a partial match is itself in one of three states,
+reported by `groupState(i)`: `'matched'` (fully matched), `'partial'` (entered
+but not yet completed), or `'none'` (never participated — `group(i)` is `null`).
 
 ```ts
 class PartialMatch {
@@ -123,8 +138,8 @@ class PartialMatch {
   get isFull(): boolean
   get isPartial(): boolean
   get matched(): string
-  get start(): number
-  get end(): number
+  get start(): number          // byte offset where the match starts
+  get end(): number            // byte offset of the input end (always haystack.length)
   get captureCount(): number
 
   group(index: number): string | null
@@ -133,19 +148,44 @@ class PartialMatch {
 }
 ```
 
-- `null` from `findPartial` → the input **cannot** be a prefix of any match.
-- `status === 'partial'` → the input is a valid prefix of some full match
-  (more input could complete it).
+Incremental typing graduates `partial` → `full` → `null`:
 
 ```js
-const re = new Regex(String.raw`token=([a-z]+)([0-9]+)`);
-const p = re.findPartial('x token=abc');
-p.isPartial;            // true
-p.group(1);             // 'abc'
-p.groupState(1);        // 'matched'
-p.groupState(2);        // 'partial'   (entered but not completed)
+const re = new Regex(String.raw`abc`);
+re.findPartial('');     // null      (nothing started yet)
+re.findPartial('a');    // partial   .status === 'partial'
+re.findPartial('ab');   // partial
+re.findPartial('abc');  // full      .isFull === true
+re.findPartial('abcd'); // null      ('d' rules out any continuation)
+```
 
-re.findPartial('x token=abc!'); // null — '!' rules out any continuation
+Group states as a match fills in. With `token=([a-z]+)([0-9]+)([A-Z]+)`:
+
+```js
+const re = new Regex(String.raw`token=([a-z]+)([0-9]+)([A-Z]+)`);
+const p = re.findPartial('x token=abc');
+
+p.isPartial;            // true
+p.matched;              // 'token=abc'
+p.start;                // 2    (byte offset of the match)
+p.end;                  // 11   (end of input — always, since end-anchored)
+p.captureCount;         // 3
+
+p.group(1);             // 'abc'   p.groupState(1); // 'matched'
+p.group(2);             // ''      p.groupState(2); // 'partial'  (entered, empty so far)
+p.group(3);             // null    p.groupState(3); // 'none'     (never entered)
+
+re.findPartial('token=abc123XYZ');  // group 3 -> 'matched', status 'full'
+re.findPartial('x token=abc!');     // null   ('!' rules out any continuation)
+```
+
+Named groups work the same way:
+
+```js
+const re = new Regex(String.raw`token=(?P<word>[a-z]+)(?P<num>[0-9]+)`);
+const p = re.findPartial('token=ab');
+p.namedGroup('word');   // 'ab'   (matched)
+p.namedGroup('num');    // ''     (partial — empty so far)
 ```
 
 ## Module-level helpers
