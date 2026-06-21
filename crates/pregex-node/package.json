@@ -1,0 +1,37 @@
+{
+  "name": "pregex",
+  "version": "0.1.0",
+  "description": "Node.js bindings for pregex, an advanced regular expression engine inspired by mrab-regex",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "Apache-2.0",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "*.node"
+  ],
+  "keywords": [
+    "regex",
+    "regular-expression",
+    "mrab-regex",
+    "pregex",
+    "text",
+    "pattern",
+    "native"
+  ],
+  "napi": {
+    "binaryName": "pregex"
+  },
+  "scripts": {
+    "build": "napi build --release --platform",
+    "build:debug": "napi build --platform",
+    "prepublishOnly": "napi prepublish -t npm",
+    "test": "node test/smoke.js"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=10"
+  }
+}

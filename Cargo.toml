@@ -28,3 +28,12 @@ path = "examples/demo.rs"
 default = []
 # Enable detailed per-node debug dumping of the compiled AST.
 trace = []
+
+[workspace]
+members = ["crates/pregex-node", "crates/pregex-python"]
+
+# Native bindings (Node/Python) benefit from a tight release profile.
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3

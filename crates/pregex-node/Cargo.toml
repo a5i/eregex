@@ -1,0 +1,20 @@
+[package]
+name = "pregex-node"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+authors = ["pregex contributors"]
+description = "Node.js bindings for pregex (napi-rs)"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+pregex = { path = "../..", version = "0.1.0" }
+napi = { version = "3", default-features = false, features = ["napi3"] }
+napi-derive = "3"
+
+[build-dependencies]
+napi-build = "2"
